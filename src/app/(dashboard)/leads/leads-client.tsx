@@ -75,7 +75,7 @@ export function LeadsClient({ initialLeads }: { initialLeads: Lead[] }) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Lead Pipeline</h1>
           <p className="text-muted-foreground text-sm mt-1">
@@ -91,8 +91,8 @@ export function LeadsClient({ initialLeads }: { initialLeads: Lead[] }) {
       </div>
 
       {/* Kanban Board */}
-      <ScrollArea className="w-full">
-        <div className="flex gap-4 pb-4 min-w-max">
+      <div className="w-full overflow-x-auto pb-4 snap-x">
+        <div className="flex gap-4 min-w-max px-1">
           {LEAD_STAGE_ORDER.map((stage) => (
             <div key={stage} className="w-72 shrink-0">
               <div className="flex items-center gap-2 mb-3">
@@ -177,8 +177,7 @@ export function LeadsClient({ initialLeads }: { initialLeads: Lead[] }) {
             </div>
           ))}
         </div>
-        <ScrollBar orientation="horizontal" />
-      </ScrollArea>
+      </div>
     </div>
   );
 }

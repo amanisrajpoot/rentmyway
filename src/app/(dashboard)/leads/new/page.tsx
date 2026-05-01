@@ -93,7 +93,7 @@ export default function NewLeadPage() {
               <div className="space-y-2">
                 <Label>Source</Label>
                 <Select name="source">
-                  <SelectTrigger className="bg-background/50">
+                  <SelectTrigger className="bg-background/50 w-full">
                     <SelectValue placeholder="How did they find you?" />
                   </SelectTrigger>
                   <SelectContent>
@@ -148,7 +148,7 @@ export default function NewLeadPage() {
               <div className="space-y-2">
                 <Label>Property Type</Label>
                 <Select name="preferred_type">
-                  <SelectTrigger className="bg-background/50">
+                  <SelectTrigger className="bg-background/50 w-full">
                     <SelectValue placeholder="Any" />
                   </SelectTrigger>
                   <SelectContent>
@@ -161,7 +161,7 @@ export default function NewLeadPage() {
               <div className="space-y-2">
                 <Label>Furnishing</Label>
                 <Select name="preferred_furnishing">
-                  <SelectTrigger className="bg-background/50">
+                  <SelectTrigger className="bg-background/50 w-full">
                     <SelectValue placeholder="Any" />
                   </SelectTrigger>
                   <SelectContent>

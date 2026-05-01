@@ -147,7 +147,7 @@ export function PropertyForm({ owners: initialOwners, property }: PropertyFormPr
               <Label>Owner *</Label>
               <div className="flex gap-2">
                 <Select value={form.owner_id} onValueChange={(v) => update('owner_id', v)} required>
-                  <SelectTrigger className="bg-background/50 flex-1">
+                  <SelectTrigger className="bg-background/50 flex-1 w-full">
                     <span className={!form.owner_id ? "text-muted-foreground" : ""}>
                       {form.owner_id ? (owners.find(o => o.id === form.owner_id)?.name || "Unknown Owner") : "Select owner"}
                     </span>
@@ -172,7 +172,7 @@ export function PropertyForm({ owners: initialOwners, property }: PropertyFormPr
             <div className="space-y-2">
               <Label>Status</Label>
               <Select value={form.status} onValueChange={(v) => update('status', v)}>
-                <SelectTrigger className="bg-background/50">
+                <SelectTrigger className="bg-background/50 w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -187,7 +187,7 @@ export function PropertyForm({ owners: initialOwners, property }: PropertyFormPr
             <div className="space-y-2">
               <Label>Property Type *</Label>
               <Select value={form.property_type} onValueChange={(v) => update('property_type', v)}>
-                <SelectTrigger className="bg-background/50">
+                <SelectTrigger className="bg-background/50 w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -201,7 +201,7 @@ export function PropertyForm({ owners: initialOwners, property }: PropertyFormPr
             <div className="space-y-2">
               <Label>Furnishing *</Label>
               <Select value={form.furnishing} onValueChange={(v) => update('furnishing', v)}>
-                <SelectTrigger className="bg-background/50">
+                <SelectTrigger className="bg-background/50 w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -373,7 +373,7 @@ export function PropertyForm({ owners: initialOwners, property }: PropertyFormPr
             <div className="space-y-2">
               <Label>Facing</Label>
               <Select value={form.facing} onValueChange={(v) => update('facing', v)}>
-                <SelectTrigger className="bg-background/50">
+                <SelectTrigger className="bg-background/50 w-full">
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
                 <SelectContent>
@@ -386,7 +386,7 @@ export function PropertyForm({ owners: initialOwners, property }: PropertyFormPr
             <div className="space-y-2">
               <Label>Preferred Tenant</Label>
               <Select value={form.preferred_tenant} onValueChange={(v) => update('preferred_tenant', v)}>
-                <SelectTrigger className="bg-background/50">
+                <SelectTrigger className="bg-background/50 w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

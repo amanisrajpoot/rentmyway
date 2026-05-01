@@ -20,9 +20,11 @@ export default async function DashboardLayout({
       <AppSidebar profile={profile} />
       <SidebarInset>
         <Header />
-        <main className="flex-1 p-4 md:p-6 animate-fade-in">
-          {children}
-        </main>
+        <div className="flex-1 min-w-0 p-4 sm:p-5 md:p-6 lg:p-8 animate-fade-in overflow-x-hidden">
+          <div className="mx-auto max-w-7xl w-full">
+            {children}
+          </div>
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );

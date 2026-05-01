@@ -92,7 +92,7 @@
     @apply bg-background text-foreground;
   }
   html {
-    @apply font-sans;
+    @apply font-sans scroll-smooth;
   }
 }
 
@@ -114,11 +114,19 @@
   }
 }
 
-/* Smooth transitions globally */
+/* ── Modern animation system ────────────────────────────────────────── */
+
+/* Premium easing curves */
+:root {
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
 @layer utilities {
   .glass {
     background: oklch(0.17 0.012 260 / 0.6);
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(16px) saturate(1.2);
     border: 1px solid oklch(0.28 0.015 260 / 0.5);
   }
 
@@ -139,30 +147,106 @@
     pointer-events: none;
   }
 
+  /* Page entrance — smooth fade + subtle upward drift */
   .animate-fade-in {
-    animation: fadeIn 0.3s ease-out;
+    animation: fadeIn 0.5s var(--ease-out-expo) both;
   }
 
+  /* Card / list item entrance — staggerable */
   .animate-slide-up {
-    animation: slideUp 0.3s ease-out;
+    animation: slideUp 0.5s var(--ease-out-expo) both;
   }
 
   .animate-slide-in-right {
-    animation: slideInRight 0.3s ease-out;
+    animation: slideInRight 0.4s var(--ease-out-expo) both;
   }
+
+  /* Stagger children in grids automatically */
+  .stagger-children > * {
+    animation: slideUp 0.5s var(--ease-out-expo) both;
+  }
+  .stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger-children > *:nth-child(2) { animation-delay: 60ms; }
+  .stagger-children > *:nth-child(3) { animation-delay: 120ms; }
+  .stagger-children > *:nth-child(4) { animation-delay: 180ms; }
+  .stagger-children > *:nth-child(5) { animation-delay: 240ms; }
+  .stagger-children > *:nth-child(6) { animation-delay: 300ms; }
+  .stagger-children > *:nth-child(7) { animation-delay: 360ms; }
+  .stagger-children > *:nth-child(8) { animation-delay: 420ms; }
+  .stagger-children > *:nth-child(9) { animation-delay: 480ms; }
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes slideInRight {
-  from { opacity: 0; transform: translateX(10px); }
+  from { opacity: 0; transform: translateX(16px); }
   to { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Global micro-interaction layer ─────────────────────────────────── */
+
+/* Cards — smooth hover lift */
+@layer base {
+  [data-slot="card"] {
+    transition: transform 0.3s var(--ease-out-expo),
+                box-shadow 0.3s var(--ease-out-expo),
+                border-color 0.3s ease;
+    will-change: transform;
+  }
+
+  [data-slot="card"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px -12px oklch(0 0 0 / 0.3),
+                0 4px 12px -4px oklch(0 0 0 / 0.1);
+  }
+
+  /* Buttons — consistent spring feel */
+  [data-slot="button"] {
+    transition: all 0.2s var(--ease-out-quart);
+  }
+
+  [data-slot="button"]:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  /* Badges — subtle entrance */
+  [data-slot="badge"] {
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* Inputs — smooth focus ring */
+  [data-slot="input"],
+  [data-slot="textarea"] {
+    transition: border-color 0.2s ease,
+                box-shadow 0.25s var(--ease-out-quart);
+  }
+}
+
+/* ── Mobile refinements ─────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  /* Disable hover-lift on touch devices */
+  [data-slot="card"]:hover {
+    transform: none;
+    box-shadow: none;
+  }
+
+  /* More comfortable touch targets */
+  [data-slot="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Cards get full-bleed feeling on mobile */
+  main {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
 }

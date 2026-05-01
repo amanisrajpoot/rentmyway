@@ -3,6 +3,7 @@
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Separator } from '@/components/ui/separator';
 import { usePathname } from 'next/navigation';
+import { ChevronRight } from 'lucide-react';
 
 const pageNames: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -55,14 +56,14 @@ export function Header() {
   const breadcrumb = getBreadcrumb(pathname);
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border/50 px-4 bg-background/80 backdrop-blur-sm sticky top-0 z-10">
-      <SidebarTrigger className="-ml-1 text-muted-foreground hover:text-foreground" />
-      <Separator orientation="vertical" className="h-5" />
-      <nav className="flex items-center gap-1.5 text-sm">
+    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border/40 px-4 sm:px-6 bg-background/60 backdrop-blur-xl sticky top-0 z-10">
+      <SidebarTrigger className="-ml-1 text-muted-foreground hover:text-foreground transition-colors" />
+      <Separator orientation="vertical" className="h-5 bg-border/60" />
+      <nav className="flex items-center gap-1 text-sm">
         {breadcrumb.parent && (
           <>
-            <span className="text-muted-foreground">{breadcrumb.parent}</span>
-            <span className="text-muted-foreground/50">/</span>
+            <span className="text-muted-foreground/70 hidden sm:inline">{breadcrumb.parent}</span>
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 hidden sm:inline" />
           </>
         )}
         <span className="font-medium">{breadcrumb.current}</span>

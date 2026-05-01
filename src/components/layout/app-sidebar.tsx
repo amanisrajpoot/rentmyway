@@ -37,10 +37,10 @@ export function AppSidebar({ profile }: AppSidebarProps) {
     .slice(0, 2);
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-sidebar-border">
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border/60">
       <SidebarHeader className="p-4">
-        <Link href="/dashboard" className="flex items-center gap-2 group">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] flex items-center justify-center text-white font-bold text-sm shrink-0">
+        <Link href="/dashboard" className="flex items-center gap-2.5 group">
+          <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-md shadow-primary/15">
             R
           </div>
           <span className="font-bold text-lg tracking-tight group-data-[collapsible=icon]:hidden">
@@ -52,10 +52,10 @@ export function AppSidebar({ profile }: AppSidebarProps) {
         </Link>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="px-2">
         {navGroups.map((group) => (
           <SidebarGroup key={group.label}>
-            <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground/60">
+            <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-semibold mb-1">
               {group.label}
             </SidebarGroupLabel>
             <SidebarMenu>
@@ -68,7 +68,11 @@ export function AppSidebar({ profile }: AppSidebarProps) {
                       render={<Link href={item.href} />}
                       isActive={isActive}
                       tooltip={item.title}
-                      className={isActive ? 'bg-sidebar-accent text-sidebar-primary font-medium' : ''}
+                      className={
+                        isActive
+                          ? 'bg-sidebar-accent text-sidebar-primary font-medium'
+                          : 'text-muted-foreground hover:text-foreground transition-colors'
+                      }
                     >
                       <Icon className="h-4 w-4" />
                       <span>{item.title}</span>
@@ -86,21 +90,21 @@ export function AppSidebar({ profile }: AppSidebarProps) {
         ))}
       </SidebarContent>
 
-      <SidebarFooter className="p-4 border-t border-sidebar-border">
+      <SidebarFooter className="p-4 border-t border-sidebar-border/50">
         <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
           <Avatar className="h-8 w-8 shrink-0">
-            <AvatarFallback className="bg-primary/20 text-primary text-xs font-medium">
+            <AvatarFallback className="bg-gradient-to-br from-primary/25 to-chart-2/25 text-primary text-xs font-semibold">
               {initials}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
             <p className="text-sm font-medium truncate">{profile.full_name}</p>
-            <p className="text-xs text-muted-foreground capitalize">{profile.role}</p>
+            <p className="text-[11px] text-muted-foreground/70 capitalize">{profile.role}</p>
           </div>
           <form action={signOut} className="group-data-[collapsible=icon]:hidden">
             <button
               type="submit"
-              className="p-1.5 rounded-md hover:bg-sidebar-accent text-muted-foreground hover:text-foreground transition-colors"
+              className="p-1.5 rounded-lg hover:bg-sidebar-accent text-muted-foreground/60 hover:text-foreground transition-all duration-200"
               title="Sign out"
             >
               <LogOut className="h-4 w-4" />
