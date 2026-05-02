@@ -19,14 +19,47 @@ export async function getComplaints(filters?: { status?: string }) {
   if (profile.role === 'broker') {
     query = query.eq('broker_id', profile.id);
   } else if (profile.role === 'tenant') {
-    const { data: tenantData } = await supabase
+    // Try profile_id first, then fall back to email-based lookup
+    let tenantId: string | null = null;
+    const { data: byProfileId } = await supabase
       .from('tenants')
       .select('id')
       .eq('profile_id', profile.id)
+      .eq('is_active', true)
       .single();
-    if (tenantData) {
-      query = query.eq('tenant_id', tenantData.id);
+    if (byProfileId) {
+      tenantId = byProfileId.id;
+    } else if (profile.email) {
+      const { data: byEmail } = await supabase
+        .from('tenants')
+        .select('id')
+        .eq('email', profile.email)
+        .eq('is_active', true)
+        .single();
+      if (byEmail) tenantId = byEmail.id;
     }
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    } else {
+      return []; // No tenant record found
+    }
+  } else if (profile.role === 'owner') {
+    // Owner: find all properties they own, then get complaints for those properties
+    const { data: owners } = await supabase
+      .from('owners')
+      .select('id')
+      .eq('email', profile.email);
+    const ownerIds = owners?.map(o => o.id) || [];
+    if (ownerIds.length === 0) return [];
+
+    const { data: properties } = await supabase
+      .from('properties')
+      .select('id')
+      .in('owner_id', ownerIds);
+    const propertyIds = properties?.map(p => p.id) || [];
+    if (propertyIds.length === 0) return [];
+
+    query = query.in('property_id', propertyIds);
   }
 
   if (filters?.status && filters.status !== 'all') {

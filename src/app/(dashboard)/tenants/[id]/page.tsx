@@ -9,8 +9,9 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import {
   ArrowLeft, Phone, Mail, IndianRupee, Calendar, Building2, FileText,
-  ExternalLink, Copy, CheckCircle, AlertCircle,
+  ExternalLink, CheckCircle, AlertCircle,
 } from 'lucide-react';
+import { CopyButton } from '@/components/ui/copy-button';
 
 export default async function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -132,9 +133,7 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
                       <code className="text-xs bg-background rounded px-2 py-1 flex-1 truncate">
                         {kycUrl}
                       </code>
-                      <Button variant="outline" size="sm" className="shrink-0">
-                        <Copy className="h-3.5 w-3.5 mr-1" /> Copy
-                      </Button>
+                      <CopyButton text={kycUrl} />
                     </div>
                   </div>
                 </>

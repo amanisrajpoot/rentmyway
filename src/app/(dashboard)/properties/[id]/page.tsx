@@ -59,10 +59,19 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Info */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Image placeholder */}
+          {/* Images */}
           <Card className="border-border/50 overflow-hidden">
-            <div className="h-64 bg-gradient-to-br from-primary/10 to-chart-2/10 flex items-center justify-center">
-              <Building2 className="h-16 w-16 text-muted-foreground/20" />
+            <div className="h-64 bg-gradient-to-br from-primary/10 to-chart-2/10 flex items-center justify-center relative">
+              {property.images && property.images.length > 0 ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img 
+                  src={property.images[0]} 
+                  alt={property.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <Building2 className="h-16 w-16 text-muted-foreground/20" />
+              )}
             </div>
           </Card>
 

@@ -110,6 +110,12 @@ export const navConfig: NavGroup[] = [
         icon: FileText,
         roles: ['tenant'],
       },
+      {
+        title: 'Payments',
+        href: '/tenant/payments',
+        icon: IndianRupee,
+        roles: ['tenant'],
+      },
     ],
   },
   {

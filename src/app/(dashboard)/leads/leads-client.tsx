@@ -1,17 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import type { Lead, LeadStatus } from '@/types/database';
 import { LEAD_STAGE_ORDER, LEAD_STAGE_LABELS, LEAD_SOURCE_LABELS } from '@/types/database';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { updateLeadStage } from '@/lib/actions/leads';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import { updateLeadStage, convertLead } from '@/lib/actions/leads';
+import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import {
-  Plus, Phone, Eye, ChevronRight, ChevronLeft, IndianRupee, MapPin, Users,
+  Plus, Phone, Eye, ChevronRight, ChevronLeft, IndianRupee, MapPin, Loader2,
 } from 'lucide-react';
 
 const stageColors: Record<LeadStatus, string> = {
@@ -38,6 +43,24 @@ const stageBadgeColors: Record<LeadStatus, string> = {
 
 export function LeadsClient({ initialLeads }: { initialLeads: Lead[] }) {
   const [leads, setLeads] = useState(initialLeads);
+  const [convertDialogOpen, setConvertDialogOpen] = useState(false);
+  const [convertingLeadId, setConvertingLeadId] = useState<string | null>(null);
+  const [selectedPropertyId, setSelectedPropertyId] = useState('');
+  const [properties, setProperties] = useState<{ id: string; title: string }[]>([]);
+  const [convertLoading, setConvertLoading] = useState(false);
+
+  useEffect(() => {
+    async function loadProperties() {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('properties')
+        .select('id, title')
+        .eq('status', 'available')
+        .order('title');
+      setProperties(data || []);
+    }
+    loadProperties();
+  }, []);
 
   // Group leads by stage
   const grouped = LEAD_STAGE_ORDER.reduce((acc, stage) => {
@@ -55,6 +78,13 @@ export function LeadsClient({ initialLeads }: { initialLeads: Lead[] }) {
 
     const newStatus = LEAD_STAGE_ORDER[newIdx];
 
+    // If moving to "converted", open the conversion dialog instead
+    if (newStatus === 'converted') {
+      setConvertingLeadId(leadId);
+      setConvertDialogOpen(true);
+      return;
+    }
+
     // Optimistic update
     setLeads((prev) =>
       prev.map((l) => (l.id === leadId ? { ...l, status: newStatus } : l))
@@ -64,11 +94,32 @@ export function LeadsClient({ initialLeads }: { initialLeads: Lead[] }) {
       await updateLeadStage(leadId, newStatus);
       toast.success(`Moved to ${LEAD_STAGE_LABELS[newStatus]}`);
     } catch {
-      // Revert
       setLeads((prev) =>
         prev.map((l) => (l.id === leadId ? { ...l, status: lead.status } : l))
       );
       toast.error('Failed to update lead stage');
+    }
+  }
+
+  async function handleConvert() {
+    if (!convertingLeadId || !selectedPropertyId) {
+      toast.error('Please select a property');
+      return;
+    }
+    setConvertLoading(true);
+    try {
+      await convertLead(convertingLeadId, selectedPropertyId);
+      setLeads((prev) =>
+        prev.map((l) => (l.id === convertingLeadId ? { ...l, status: 'converted' as LeadStatus } : l))
+      );
+      toast.success('Lead converted to tenant successfully! KYC link generated.');
+      setConvertDialogOpen(false);
+      setConvertingLeadId(null);
+      setSelectedPropertyId('');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to convert lead');
+    } finally {
+      setConvertLoading(false);
     }
   }
 
@@ -178,6 +229,44 @@ export function LeadsClient({ initialLeads }: { initialLeads: Lead[] }) {
           ))}
         </div>
       </div>
+
+      {/* Conversion Dialog */}
+      <Dialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Convert Lead to Tenant</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-muted-foreground">
+              Assign an available property to this lead. A tenant record will be created and a KYC link will be generated automatically.
+            </p>
+            <div className="space-y-2">
+              <Label>Available Property *</Label>
+              <Select value={selectedPropertyId} onValueChange={(val) => setSelectedPropertyId(val ?? '')}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a property" />
+                </SelectTrigger>
+                <SelectContent>
+                  {properties.length === 0 ? (
+                    <SelectItem value="none" disabled>No available properties</SelectItem>
+                  ) : (
+                    properties.map(p => (
+                      <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => setConvertDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleConvert} disabled={convertLoading || !selectedPropertyId}>
+                {convertLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Convert & Create Tenant
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

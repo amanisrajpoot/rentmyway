@@ -13,6 +13,7 @@ import {
   ArrowLeft, Phone, Mail, MapPin, IndianRupee, Calendar, MessageSquare,
   Building2, Clock, Sparkles, ExternalLink
 } from 'lucide-react';
+import { AddFollowUpDialog } from '@/components/leads/add-follow-up';
 
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -193,11 +194,12 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
           {/* Follow-ups Timeline */}
           <Card className="border-border/50">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between py-4">
               <CardTitle className="text-base flex items-center gap-2">
                 <Clock className="h-4 w-4 text-primary" />
                 Follow-up History
               </CardTitle>
+              <AddFollowUpDialog leadId={id} />
             </CardHeader>
             <CardContent>
               {followUps.length === 0 ? (

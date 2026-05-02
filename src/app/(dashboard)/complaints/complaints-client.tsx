@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import type { Complaint } from '@/types/database';
 import { COMPLAINT_STATUS_LABELS } from '@/types/database';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,7 +13,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import {
   MessageSquareWarning, Building2, User, Wrench, AlertTriangle,
-  Clock, CheckCircle, XCircle,
+  Clock, CheckCircle, XCircle, Plus,
 } from 'lucide-react';
 
 const statusColors: Record<string, string> = {
@@ -53,24 +54,32 @@ export function ComplaintsClient({ initialComplaints }: { initialComplaints: Com
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Complaints</h1>
           <p className="text-muted-foreground text-sm mt-1">
             Track maintenance issues and complaints
           </p>
         </div>
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? 'all')}>
-          <SelectTrigger className="w-[150px] bg-card">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            {Object.entries(COMPLAINT_STATUS_LABELS).map(([k, v]) => (
-              <SelectItem key={k} value={k}>{v}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex gap-3">
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? 'all')}>
+            <SelectTrigger className="w-[150px] bg-card">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              {Object.entries(COMPLAINT_STATUS_LABELS).map(([k, v]) => (
+                <SelectItem key={k} value={k}>{v}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Link href="/complaints/new">
+            <Button className="bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white">
+              <Plus className="h-4 w-4 mr-2" />
+              New Complaint
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {filtered.length === 0 ? (

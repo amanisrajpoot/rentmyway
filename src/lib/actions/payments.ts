@@ -10,11 +10,26 @@ export async function getPayments() {
   const profile = await getUserProfile();
   if (!profile) return [];
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('rent_payments')
     .select('*, tenant:tenants(name, phone), property:properties(title, locality)')
     .order('payment_date', { ascending: false });
 
+  if (profile.role === 'broker') {
+    // Filter payments for properties owned by this broker
+    const { data: properties } = await supabase
+      .from('properties')
+      .select('id')
+      .eq('broker_id', profile.id);
+    const propIds = properties?.map(p => p.id) || [];
+    if (propIds.length > 0) {
+      query = query.in('property_id', propIds);
+    } else {
+      return [];
+    }
+  }
+
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   return data || [];
 }

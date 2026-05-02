@@ -33,6 +33,44 @@ async function getBrokerStats(brokerId: string) {
   };
 }
 
+async function getOwnerStats(email: string) {
+  const supabase = await createClient();
+  const { data: owners } = await supabase.from('owners').select('id').eq('email', email);
+  const ownerIds = owners?.map(o => o.id) || [];
+  if (ownerIds.length === 0) return null;
+
+  const { data: properties } = await supabase.from('properties').select('id, status, rent').in('owner_id', ownerIds);
+  const props = properties || [];
+  const propertyIds = props.map(p => p.id);
+  
+  const { data: complaints } = await supabase.from('complaints').select('id, status').in('property_id', propertyIds);
+  const comps = complaints || [];
+
+  return {
+    totalProperties: props.length,
+    rentedProperties: props.filter(p => p.status === 'rented').length,
+    monthlyRent: props.filter(p => p.status === 'rented').reduce((sum, p) => sum + (p.rent || 0), 0),
+    openComplaints: comps.filter(c => ['open', 'in_progress'].includes(c.status)).length,
+  };
+}
+
+async function getTenantStats(email: string) {
+  const supabase = await createClient();
+  const { data: tenant } = await supabase.from('tenants').select('id, rent_amount, move_in_date, lease_end_date').eq('email', email).eq('is_active', true).single();
+  
+  if (!tenant) return null;
+
+  const { data: complaints } = await supabase.from('complaints').select('id, status').eq('tenant_id', tenant.id);
+  const comps = complaints || [];
+
+  return {
+    rentAmount: tenant.rent_amount,
+    leaseEnd: tenant.lease_end_date,
+    moveIn: tenant.move_in_date,
+    openComplaints: comps.filter(c => ['open', 'in_progress'].includes(c.status)).length,
+  };
+}
+
 const statCards = [
   {
     title: 'Properties',
@@ -104,6 +142,8 @@ export default async function DashboardPage() {
   if (!profile) redirect('/login');
 
   const stats = profile.role === 'broker' ? await getBrokerStats(profile.id) : null;
+  const ownerStats = profile.role === 'owner' ? await getOwnerStats(profile.email || '') : null;
+  const tenantStats = profile.role === 'tenant' ? await getTenantStats(profile.email || '') : null;
 
   return (
     <div className="space-y-8">
@@ -113,11 +153,13 @@ export default async function DashboardPage() {
           Welcome back, {profile.full_name.split(' ')[0]}
         </h1>
         <p className="text-muted-foreground mt-1.5 text-sm sm:text-base">
-          Here&apos;s what&apos;s happening with your properties today.
+          {profile.role === 'broker' && "Here's what's happening with your properties today."}
+          {profile.role === 'owner' && "Here is the summary of your property portfolio."}
+          {profile.role === 'tenant' && "Here is your current rental status."}
         </p>
       </div>
 
-      {/* Stats Grid */}
+      {/* Broker Stats Grid */}
       {stats && profile.role === 'broker' && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 stagger-children">
           {statCards.map((card) => {
@@ -148,7 +190,7 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* Quick actions for brokers */}
+      {/* Broker Quick actions */}
       {profile.role === 'broker' && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 stagger-children">
           {quickActions.map((action) => {
@@ -173,46 +215,91 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* Owner & Tenant dashboard */}
-      {profile.role !== 'broker' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 stagger-children">
-          <Card className="border-border/50">
-            <CardHeader>
-              <CardTitle className="text-lg">My Portal</CardTitle>
+      {/* Owner Dashboard */}
+      {profile.role === 'owner' && ownerStats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 stagger-children">
+          <Card className="border-border/50 bg-gradient-to-br from-background to-muted/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground font-medium">Total Properties</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Welcome to your unified {profile.role} portal. Navigate using the sidebar to view your detailed dashboard.
-              </p>
-              <Link href={profile.role === 'owner' ? '/owner/properties' : '/tenant/property'}>
-                <Badge variant="default" className="text-sm py-1 cursor-pointer hover:bg-primary/90 transition-colors">
-                  {profile.role === 'owner' ? 'View My Properties' : 'View My Rental Details'}
-                </Badge>
-              </Link>
+              <div className="text-3xl font-bold">{ownerStats.totalProperties}</div>
+              <p className="text-xs text-muted-foreground mt-1">{ownerStats.rentedProperties} currently rented</p>
             </CardContent>
           </Card>
-          <Card className="border-border/50">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <MessageSquareWarning className="h-5 w-5 text-muted-foreground" />
-                Support & Issues
-              </CardTitle>
+          
+          <Card className="border-border/50 bg-gradient-to-br from-background to-emerald-500/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground font-medium">Monthly Rent Yield</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Have an issue? Raise a complaint directly through your dashboard.
-              </p>
-              <Link href="/complaints">
-                <Badge variant="outline" className="text-sm py-1 cursor-pointer hover:bg-accent transition-colors">
-                  View Complaints
-                </Badge>
-              </Link>
+              <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">₹{ownerStats.monthlyRent.toLocaleString('en-IN')}</div>
+              <p className="text-xs text-muted-foreground mt-1">From active tenants</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/50 bg-gradient-to-br from-background to-amber-500/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground font-medium">Occupancy Rate</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">
+                {ownerStats.totalProperties > 0 ? Math.round((ownerStats.rentedProperties / ownerStats.totalProperties) * 100) : 0}%
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Properties filled</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/50 bg-gradient-to-br from-background to-red-500/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground font-medium">Open Maintenance</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-red-600 dark:text-red-400">{ownerStats.openComplaints}</div>
+              <p className="text-xs text-muted-foreground mt-1">Issues needing attention</p>
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* Recent activity */}
+      {/* Tenant Dashboard */}
+      {profile.role === 'tenant' && tenantStats && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 stagger-children">
+          <Card className="border-border/50 bg-gradient-to-br from-background to-emerald-500/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground font-medium">Monthly Rent</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">₹{tenantStats.rentAmount.toLocaleString('en-IN')}</div>
+              <p className="text-xs text-muted-foreground mt-1">Due next month</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/50 bg-gradient-to-br from-background to-blue-500/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground font-medium">Lease Status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-xl font-bold text-blue-600 dark:text-blue-400 mt-1">
+                {tenantStats.leaseEnd ? new Date(tenantStats.leaseEnd).toLocaleDateString() : 'Ongoing'}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Lease end date</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/50 bg-gradient-to-br from-background to-amber-500/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground font-medium">Maintenance</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">{tenantStats.openComplaints}</div>
+              <p className="text-xs text-muted-foreground mt-1">Open tickets</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Broker Recent activity */}
       {profile.role === 'broker' && (
         <Card className="border-border/50 animate-fade-in">
           <CardHeader>
