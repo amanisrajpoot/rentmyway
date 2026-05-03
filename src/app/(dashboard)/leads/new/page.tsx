@@ -197,7 +197,7 @@ export default function NewLeadPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Property Type</Label>
-                <Select name="preferred_type" value={prefType} onValueChange={setPrefType}>
+                <Select name="preferred_type" value={prefType} onValueChange={(v) => setPrefType(v || '')}>
                   <SelectTrigger className="bg-background/50 w-full">
                     <SelectValue placeholder="Any" />
                   </SelectTrigger>
@@ -210,7 +210,7 @@ export default function NewLeadPage() {
               </div>
               <div className="space-y-2">
                 <Label>Furnishing</Label>
-                <Select name="preferred_furnishing" value={furnishing} onValueChange={setFurnishing}>
+                <Select name="preferred_furnishing" value={furnishing} onValueChange={(v) => setFurnishing(v || '')}>
                   <SelectTrigger className="bg-background/50 w-full">
                     <SelectValue placeholder="Any" />
                   </SelectTrigger>

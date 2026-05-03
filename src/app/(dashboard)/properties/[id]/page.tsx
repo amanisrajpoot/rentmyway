@@ -73,7 +73,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
                 </div>
                 {property.images.length > 1 && (
                   <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                    {property.images.slice(1).map((url, idx) => (
+                    {property.images.slice(1).map((url: string, idx: number) => (
                       <div key={idx} className="h-20 w-32 shrink-0 rounded-md overflow-hidden border bg-black/5">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={url} alt={`Property view ${idx + 2}`} className="w-full h-full object-cover" />
