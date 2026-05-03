@@ -12,12 +12,58 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Save, User, Phone, MapPin, IndianRupee } from 'lucide-react';
+import { Loader2, Save, User, Phone, MapPin, IndianRupee, Mic } from 'lucide-react';
 import { toast } from 'sonner';
+import { VoiceAssistant } from '@/components/ui/voice-assistant';
+import { MediaUploader } from '@/components/ui/media-uploader';
 
 export default function NewLeadPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [images, setImages] = useState<string[]>([]);
+  const [prefType, setPrefType] = useState<string>('');
+  const [furnishing, setFurnishing] = useState<string>('');
+
+  const handleVoiceData = (data: any) => {
+    if (data.name) {
+      const el = document.querySelector('input[name="name"]') as HTMLInputElement;
+      if (el) el.value = data.name;
+    }
+    if (data.phone) {
+      const el = document.querySelector('input[name="phone"]') as HTMLInputElement;
+      if (el) el.value = data.phone;
+    }
+    if (data.email) {
+      const el = document.querySelector('input[name="email"]') as HTMLInputElement;
+      if (el) el.value = data.email;
+    }
+    if (data.budget_min) {
+      const el = document.querySelector('input[name="budget_min"]') as HTMLInputElement;
+      if (el) el.value = data.budget_min;
+    }
+    if (data.budget_max) {
+      const el = document.querySelector('input[name="budget_max"]') as HTMLInputElement;
+      if (el) el.value = data.budget_max;
+    }
+    if (data.preferred_locality) {
+      const el = document.querySelector('input[name="preferred_locality"]') as HTMLInputElement;
+      if (el) el.value = data.preferred_locality;
+    }
+    if (data.preferred_city) {
+      const el = document.querySelector('input[name="preferred_city"]') as HTMLInputElement;
+      if (el) el.value = data.preferred_city;
+    }
+    if (data.notes) {
+      const el = document.querySelector('textarea[name="notes"]') as HTMLTextAreaElement;
+      if (el) el.value = data.notes;
+    }
+    if (data.preferred_type) {
+      setPrefType(data.preferred_type);
+    }
+    if (data.furnishing) {
+      setFurnishing(data.furnishing);
+    }
+  };
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -40,6 +86,7 @@ export default function NewLeadPage() {
         preferred_furnishing: (formData.get('preferred_furnishing') as string) || null,
         move_in_date: (formData.get('move_in_date') as string) || null,
         notes: (formData.get('notes') as string) || null,
+        images: images.length > 0 ? images : null,
         lost_reason: null,
         broker_id: '',
       });
@@ -55,14 +102,17 @@ export default function NewLeadPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Add Lead</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Create a new customer inquiry
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Add Lead</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Create a new customer inquiry
+          </p>
+        </div>
+        <VoiceAssistant formType="lead" onParsed={handleVoiceData} />
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
         {/* Contact Info */}
         <Card className="border-border/50">
           <CardHeader>
@@ -147,7 +197,7 @@ export default function NewLeadPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Property Type</Label>
-                <Select name="preferred_type">
+                <Select name="preferred_type" value={prefType} onValueChange={setPrefType}>
                   <SelectTrigger className="bg-background/50 w-full">
                     <SelectValue placeholder="Any" />
                   </SelectTrigger>
@@ -160,7 +210,7 @@ export default function NewLeadPage() {
               </div>
               <div className="space-y-2">
                 <Label>Furnishing</Label>
-                <Select name="preferred_furnishing">
+                <Select name="preferred_furnishing" value={furnishing} onValueChange={setFurnishing}>
                   <SelectTrigger className="bg-background/50 w-full">
                     <SelectValue placeholder="Any" />
                   </SelectTrigger>
@@ -186,6 +236,27 @@ export default function NewLeadPage() {
                 rows={3}
               />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Media / Audio Notes */}
+        <Card className="border-border/50">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Mic className="h-4 w-4 text-primary" />
+              Media & Audio Notes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <MediaUploader
+              value={images}
+              onChange={setImages}
+              maxFiles={5}
+              acceptedTypes="image/*,audio/*,video/*"
+            />
+            <p className="text-[10px] text-muted-foreground mt-2 italic">
+              * Tip: Record a quick audio note about the lead's requirements or take photos of their profile docs.
+            </p>
           </CardContent>
         </Card>
 

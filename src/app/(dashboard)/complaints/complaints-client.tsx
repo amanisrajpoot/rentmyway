@@ -134,6 +134,17 @@ export function ComplaintsClient({ initialComplaints }: { initialComplaints: Com
                       </span>
                     </div>
 
+                    {complaint.images && complaint.images.length > 0 && (
+                      <div className="flex gap-2 py-1 overflow-x-auto">
+                        {complaint.images.map((url, i) => (
+                          <div key={i} className="h-16 w-24 shrink-0 rounded border overflow-hidden bg-muted">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={url} alt="Attachment" className="w-full h-full object-cover" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     {complaint.status !== 'closed' && (
                       <div className="flex gap-2 pt-1">
                         {complaint.status === 'open' && (

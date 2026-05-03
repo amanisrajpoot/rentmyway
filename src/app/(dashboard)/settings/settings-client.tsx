@@ -11,18 +11,22 @@ import { User, Mail, Phone, Shield, Edit2, Loader2, Save, X } from 'lucide-react
 import { updateProfile } from '@/lib/actions/auth';
 import { toast } from 'sonner';
 
+import { MediaUploader } from '@/components/ui/media-uploader';
+
 type Profile = {
   id: string;
   full_name: string;
   email: string;
   phone: string;
   role: string;
+  avatar_url?: string | null;
 };
 
 export function SettingsClient({ initialProfile }: { initialProfile: Profile }) {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState(initialProfile);
+  const [avatarUrl, setAvatarUrl] = useState<string[]>(initialProfile.avatar_url ? [initialProfile.avatar_url] : []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -30,10 +34,11 @@ export function SettingsClient({ initialProfile }: { initialProfile: Profile }) 
     const fd = new FormData(e.currentTarget);
     const fullName = fd.get('full_name') as string;
     const phone = fd.get('phone') as string;
+    const finalAvatar = avatarUrl.length > 0 ? avatarUrl[0] : null;
 
     try {
-      await updateProfile({ full_name: fullName, phone });
-      setProfile(prev => ({ ...prev, full_name: fullName, phone }));
+      await updateProfile({ full_name: fullName, phone, avatar_url: finalAvatar });
+      setProfile(prev => ({ ...prev, full_name: fullName, phone, avatar_url: finalAvatar }));
       toast.success('Profile updated successfully');
       setIsEditing(false);
     } catch (err: unknown) {
@@ -66,9 +71,13 @@ export function SettingsClient({ initialProfile }: { initialProfile: Profile }) 
           {!isEditing ? (
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xl font-bold">
-                  {profile.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
-                </div>
+                {profile.avatar_url ? (
+                  <img src={profile.avatar_url} alt="Profile" className="h-16 w-16 rounded-full object-cover border" />
+                ) : (
+                  <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xl font-bold">
+                    {profile.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                  </div>
+                )}
                 <div>
                   <h2 className="text-lg font-semibold">{profile.full_name}</h2>
                   <Badge variant="outline" className="capitalize mt-1">
@@ -97,6 +106,15 @@ export function SettingsClient({ initialProfile }: { initialProfile: Profile }) 
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
+              <div className="space-y-2">
+                <Label>Profile Picture</Label>
+                <MediaUploader
+                  value={avatarUrl}
+                  onChange={setAvatarUrl}
+                  maxFiles={1}
+                  acceptedTypes="image/*"
+                />
+              </div>
               <div className="space-y-2">
                 <Label>Full Name</Label>
                 <Input name="full_name" defaultValue={profile.full_name} required />

@@ -63,6 +63,9 @@ export async function createProperty(data: PropertyInsert) {
   };
 
   if (!sanitized.owner_id) throw new Error('Please select an owner before saving.');
+  if (!sanitized.images || sanitized.images.length === 0) {
+    throw new Error('At least one property image is mandatory for a listing.');
+  }
 
   const { data: property, error } = await supabase
     .from('properties')
@@ -78,6 +81,10 @@ export async function createProperty(data: PropertyInsert) {
 
 export async function updateProperty(id: string, data: PropertyUpdate) {
   const supabase = await createClient();
+
+  if (data.images !== undefined && (!data.images || data.images.length === 0)) {
+    throw new Error('At least one property image is mandatory for a listing.');
+  }
 
   const { error } = await supabase
     .from('properties')

@@ -10,9 +10,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Save, MessageSquareWarning, AlertTriangle } from 'lucide-react';
+import { Loader2, Save, MessageSquareWarning, AlertTriangle, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
+import { MediaUploader } from '@/components/ui/media-uploader';
+import { VoiceAssistant } from '@/components/ui/voice-assistant';
 
 export default function NewComplaintPage() {
   const router = useRouter();
@@ -25,6 +27,7 @@ export default function NewComplaintPage() {
   const [selectedProperty, setSelectedProperty] = useState('');
   const [selectedTenant, setSelectedTenant] = useState('');
   const [priority, setPriority] = useState('medium');
+  const [images, setImages] = useState<string[]>([]);
 
   useEffect(() => {
     async function loadData() {
@@ -82,6 +85,20 @@ export default function NewComplaintPage() {
     loadTenants();
   }, [selectedProperty, userRole]);
 
+  const handleVoiceData = (data: any) => {
+    if (data.title) {
+      const el = document.querySelector('input[name="title"]') as HTMLInputElement;
+      if (el) el.value = data.title;
+    }
+    if (data.description) {
+      const el = document.querySelector('textarea[name="description"]') as HTMLTextAreaElement;
+      if (el) el.value = data.description;
+    }
+    if (data.priority) {
+      setPriority(data.priority);
+    }
+  };
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!selectedProperty || !selectedTenant) {
@@ -106,7 +123,7 @@ export default function NewComplaintPage() {
         priority: priority as 'low' | 'medium' | 'high' | 'urgent',
         resolution_notes: null,
         cost: null,
-        images: null,
+        images: images.length > 0 ? images : null,
       });
       toast.success('Complaint created');
       router.push('/complaints');
@@ -119,11 +136,14 @@ export default function NewComplaintPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">New Complaint</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Report a maintenance issue or complaint
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">New Complaint</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Report a maintenance issue or complaint
+          </p>
+        </div>
+        <VoiceAssistant formType="complaint" onParsed={handleVoiceData} />
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -199,6 +219,23 @@ export default function NewComplaintPage() {
                 </SelectContent>
               </Select>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/50">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Camera className="h-4 w-4 text-primary" />
+              Photos / Videos of the Issue
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <MediaUploader
+              value={images}
+              onChange={setImages}
+              maxFiles={5}
+              acceptedTypes="image/*,video/*"
+            />
           </CardContent>
         </Card>
 

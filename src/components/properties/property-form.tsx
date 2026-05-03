@@ -14,8 +14,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Loader2, Save, Plus, Building2, MapPin, IndianRupee, Settings, UserPlus } from 'lucide-react';
+import { Loader2, Save, Plus, Building2, MapPin, IndianRupee, Settings, UserPlus, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import { MediaUploader } from '@/components/ui/media-uploader';
+import dynamic from 'next/dynamic';
+
+const MapPicker = dynamic(() => import('@/components/ui/map-picker'), { 
+  ssr: false,
+  loading: () => <div className="h-[300px] w-full bg-muted animate-pulse rounded-xl flex items-center justify-center text-muted-foreground text-sm">Loading Interactive Map...</div>
+});
+import { VoiceAssistant } from '@/components/ui/voice-assistant';
 
 interface PropertyFormProps {
   owners: Owner[];
@@ -53,9 +61,10 @@ export function PropertyForm({ owners: initialOwners, property }: PropertyFormPr
     bachelor_allowed: property?.bachelor_allowed ?? true,
     preferred_tenant: (property?.preferred_tenant || 'any') as PreferredTenant,
     description: property?.description || '',
+    images: property?.images || [] as string[],
   });
 
-  const update = (field: string, value: string | boolean | null) => {
+  const update = (field: string, value: string | boolean | null | string[]) => {
     setForm((prev) => ({ ...prev, [field]: value ?? '' }));
   };
 
@@ -64,6 +73,11 @@ export function PropertyForm({ owners: initialOwners, property }: PropertyFormPr
 
     if (!form.owner_id) {
       toast.error('Please select an owner first. Use the + button to add one if needed.');
+      return;
+    }
+
+    if (!form.images || form.images.length === 0) {
+      toast.error('At least one property image is mandatory.');
       return;
     }
 
@@ -81,7 +95,7 @@ export function PropertyForm({ owners: initialOwners, property }: PropertyFormPr
         pincode: form.pincode || null,
         facing: form.facing || null,
         description: form.description || null,
-        images: property?.images || null,
+        images: form.images.length > 0 ? form.images : null,
         broker_id: '', // overwritten by server action
       };
 
@@ -118,9 +132,38 @@ export function PropertyForm({ owners: initialOwners, property }: PropertyFormPr
     }
   }
 
+  const handleVoiceData = (data: any) => {
+    setForm(prev => ({
+      ...prev,
+      title: data.title || prev.title,
+      property_type: data.property_type || prev.property_type,
+      furnishing: data.furnishing || prev.furnishing,
+      rent: data.rent ? data.rent.toString() : prev.rent,
+      deposit: data.deposit ? data.deposit.toString() : prev.deposit,
+      locality: data.locality || prev.locality,
+      city: data.city || prev.city,
+      parking: data.parking !== null ? data.parking : prev.parking,
+      pet_friendly: data.pet_friendly !== null ? data.pet_friendly : prev.pet_friendly,
+    }));
+  };
+
+  const handleLocationSelect = (data: any) => {
+    setForm(prev => ({
+      ...prev,
+      locality: data.locality || prev.locality,
+      city: data.city || prev.city,
+      state: data.state || prev.state,
+      pincode: data.pincode || prev.pincode,
+      address: data.address || prev.address,
+    }));
+  };
+
   return (
     <>
     <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="flex justify-end mb-2">
+        <VoiceAssistant formType="property" onParsed={handleVoiceData} />
+      </div>
       {/* Basic Info */}
       <Card className="border-border/50">
         <CardHeader>
@@ -215,15 +258,35 @@ export function PropertyForm({ owners: initialOwners, property }: PropertyFormPr
         </CardContent>
       </Card>
 
+      {/* Media & Images */}
+      <Card className="border-border/50">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <ImageIcon className="h-4 w-4 text-primary" />
+            Media & Images *
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <MediaUploader
+            value={form.images}
+            onChange={(urls) => update('images', urls)}
+            maxFiles={10}
+            acceptedTypes="image/*,video/*"
+          />
+        </CardContent>
+      </Card>
+
       {/* Location */}
       <Card className="border-border/50">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <MapPin className="h-4 w-4 text-primary" />
-            Location
+            Location & Map Picker
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
+          <MapPicker onLocationSelect={handleLocationSelect} />
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Locality *</Label>
@@ -430,6 +493,7 @@ export function PropertyForm({ owners: initialOwners, property }: PropertyFormPr
           </div>
         </CardContent>
       </Card>
+
 
       {/* Submit */}
       <div className="flex justify-end gap-3">

@@ -92,7 +92,7 @@ export async function getUserProfile() {
   return profile;
 }
 
-export async function updateProfile(data: { full_name: string; phone: string }) {
+export async function updateProfile(data: { full_name: string; phone: string; avatar_url?: string | null }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
@@ -109,6 +109,7 @@ export async function updateProfile(data: { full_name: string; phone: string }) 
     data: {
       full_name: data.full_name,
       phone: data.phone,
+      avatar_url: data.avatar_url,
     }
   });
 }

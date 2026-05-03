@@ -99,6 +99,7 @@ export interface Lead {
   preferred_furnishing: string | null;
   move_in_date: string | null;
   notes: string | null;
+  images: string[] | null;
   lost_reason: string | null;
   created_at: string;
   updated_at: string;

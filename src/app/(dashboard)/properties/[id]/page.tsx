@@ -61,18 +61,32 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
         <div className="lg:col-span-2 space-y-6">
           {/* Images */}
           <Card className="border-border/50 overflow-hidden">
-            <div className="h-64 bg-gradient-to-br from-primary/10 to-chart-2/10 flex items-center justify-center relative">
-              {property.images && property.images.length > 0 ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img 
-                  src={property.images[0]} 
-                  alt={property.title}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
+            {property.images && property.images.length > 0 ? (
+              <div className="space-y-4 p-4 bg-muted/30">
+                <div className="h-96 w-full rounded-lg overflow-hidden relative border bg-black/5">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img 
+                    src={property.images[0]} 
+                    alt={property.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                {property.images.length > 1 && (
+                  <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                    {property.images.slice(1).map((url, idx) => (
+                      <div key={idx} className="h-20 w-32 shrink-0 rounded-md overflow-hidden border bg-black/5">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt={`Property view ${idx + 2}`} className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="h-64 bg-gradient-to-br from-primary/10 to-chart-2/10 flex items-center justify-center relative">
                 <Building2 className="h-16 w-16 text-muted-foreground/20" />
-              )}
-            </div>
+              </div>
+            )}
           </Card>
 
           {/* Property Details */}
