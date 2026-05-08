@@ -296,8 +296,8 @@ export function PaymentsClient({
                         </span>
                       </TableCell>
                       <TableCell>
-                        <Badge className={cn("capitalize font-normal", modeColors[payment.payment_mode])}>
-                          {payment.payment_mode.replace(/_/g, ' ')}
+                        <Badge className={cn("capitalize font-normal", modeColors[payment.payment_mode || 'other'])}>
+                          {(payment.payment_mode || 'other').replace(/_/g, ' ')}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
