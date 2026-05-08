@@ -316,7 +316,7 @@ export function PaymentsClient({
                             propertyAddress: (payment as any).property?.locality || 'N/A',
                             amount: payment.amount,
                             monthYear: payment.month_year,
-                            paymentMode: payment.payment_mode,
+                            paymentMode: payment.payment_mode || 'other',
                             notes: payment.notes || undefined
                           })}
                           title="Download Receipt"

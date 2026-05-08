@@ -315,6 +315,26 @@ export function CommissionsClient({ initialCommissions, stats }: { initialCommis
                       <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Commission Type</p>
                       <p className="text-sm font-medium capitalize">{c.commission_type.replace(/_/g, ' ')}</p>
                     </div>
+
+                    <Button 
+                      variant="ghost" 
+                      size="icon-xs"
+                      onClick={() => PDFGenerator.generateCommissionInvoice({
+                        invoiceNo: c.id.slice(0, 8).toUpperCase(),
+                        date: format(new Date(), 'dd MMM yyyy'),
+                        ownerName: (c as any).owner?.name || 'N/A',
+                        propertyName: c.property?.title || 'N/A',
+                        tenantName: c.tenant?.name || 'N/A',
+                        commissionType: c.commission_type,
+                        commissionValue: c.commission_value,
+                        computedAmount: c.computed_amount,
+                        dealDate: format(new Date(c.deal_date), 'dd MMM yyyy'),
+                        notes: c.notes || undefined
+                      })}
+                      title="Download Invoice"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
                     
                     <DropdownMenu>
                       <DropdownMenuTrigger render={
