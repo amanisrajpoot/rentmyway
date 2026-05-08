@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getUserProfile } from '@/lib/actions/auth';
 import { revalidatePath } from 'next/cache';
 import type { PropertyInsert, PropertyUpdate } from '@/types/database';
+import { logActivity } from './activity-log';
 
 export async function getProperties(filters?: {
   status?: string;
@@ -76,6 +77,15 @@ export async function createProperty(data: PropertyInsert) {
   if (error) throw new Error(error.message);
 
   revalidatePath('/properties');
+
+  await logActivity({
+    user_id: profile.id,
+    action: 'create_property',
+    entity_type: 'property',
+    entity_id: property.id,
+    details: { title: property.title },
+  });
+
   return property;
 }
 
@@ -109,6 +119,17 @@ export async function markPropertyAsRented(propertyId: string) {
 
   revalidatePath('/properties');
   revalidatePath(`/properties/${propertyId}`);
+
+  const profile = await getUserProfile();
+  if (profile) {
+    await logActivity({
+      user_id: profile.id,
+      action: 'mark_rented',
+      entity_type: 'property',
+      entity_id: propertyId,
+      details: { status: 'rented' },
+    });
+  }
 }
 
 export async function markPropertyAsAvailable(propertyId: string) {
@@ -139,6 +160,7 @@ export async function deleteProperty(id: string) {
   if (error) throw new Error(error.message);
 
   revalidatePath('/properties');
+  return { success: true };
 }
 
 export async function getOwners() {

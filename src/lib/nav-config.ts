@@ -9,6 +9,15 @@ import {
   FileText,
   Home,
   Wrench,
+  ScrollText,
+  Receipt,
+  Bell,
+  Zap,
+  CalendarClock,
+  Wallet,
+  Megaphone,
+  BarChart3,
+  PieChart,
 } from 'lucide-react';
 import { type UserRole } from '@/types/database';
 
@@ -47,6 +56,12 @@ export const navConfig: NavGroup[] = [
         roles: ['broker'],
       },
       {
+        title: 'Owners',
+        href: '/owners',
+        icon: Users,
+        roles: ['broker'],
+      },
+      {
         title: 'My Properties',
         href: '/owner/properties',
         icon: Home,
@@ -81,10 +96,10 @@ export const navConfig: NavGroup[] = [
     label: 'Operations',
     items: [
       {
-        title: 'Complaints',
-        href: '/complaints',
-        icon: MessageSquareWarning,
-        roles: ['broker', 'owner', 'tenant'],
+        title: 'Leases',
+        href: '/leases',
+        icon: ScrollText,
+        roles: ['broker'],
       },
       {
         title: 'Payments',
@@ -93,9 +108,40 @@ export const navConfig: NavGroup[] = [
         roles: ['broker'],
       },
       {
-        title: 'Rent',
-        href: '/owner/rent',
-        icon: IndianRupee,
+        title: 'Maintenance',
+        href: '/maintenance',
+        icon: Wrench,
+        roles: ['broker'],
+      },
+      {
+        title: 'Complaints',
+        href: '/complaints',
+        icon: MessageSquareWarning,
+        roles: ['broker', 'owner', 'tenant'],
+      },
+      {
+        title: 'Utility Bills',
+        href: '/utility-bills',
+        icon: Zap,
+        roles: ['broker'],
+      },
+      // Owner operations
+      {
+        title: 'Leases',
+        href: '/owner/leases',
+        icon: ScrollText,
+        roles: ['owner'],
+      },
+      {
+        title: 'Financials',
+        href: '/owner/financials',
+        icon: Wallet,
+        roles: ['owner'],
+      },
+      {
+        title: 'Documents',
+        href: '/owner/documents',
+        icon: FileText,
         roles: ['owner'],
       },
       {
@@ -104,10 +150,11 @@ export const navConfig: NavGroup[] = [
         icon: Wrench,
         roles: ['owner'],
       },
+      // Tenant operations
       {
-        title: 'Documents',
-        href: '/tenant/documents',
-        icon: FileText,
+        title: 'Lease',
+        href: '/tenant/lease',
+        icon: ScrollText,
         roles: ['tenant'],
       },
       {
@@ -116,11 +163,51 @@ export const navConfig: NavGroup[] = [
         icon: IndianRupee,
         roles: ['tenant'],
       },
+      {
+        title: 'Documents',
+        href: '/tenant/documents',
+        icon: FileText,
+        roles: ['tenant'],
+      },
+    ],
+  },
+  {
+    label: 'Communication',
+    items: [
+      {
+        title: 'Announcements',
+        href: '/announcements',
+        icon: Megaphone,
+        roles: ['broker'],
+      },
+    ],
+  },
+  {
+    label: 'Business',
+    items: [
+      {
+        title: 'Commissions',
+        href: '/commissions',
+        icon: PieChart,
+        roles: ['broker'],
+      },
+      {
+        title: 'Analytics',
+        href: '/analytics',
+        icon: BarChart3,
+        roles: ['broker', 'owner'],
+      },
     ],
   },
   {
     label: 'System',
     items: [
+      {
+        title: 'Notifications',
+        href: '/notifications',
+        icon: Bell,
+        roles: ['broker', 'owner', 'tenant'],
+      },
       {
         title: 'Settings',
         href: '/settings',

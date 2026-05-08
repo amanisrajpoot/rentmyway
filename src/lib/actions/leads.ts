@@ -5,6 +5,7 @@ import { getUserProfile } from '@/lib/actions/auth';
 import { revalidatePath } from 'next/cache';
 import type { LeadInsert, LeadUpdate, LeadStatus } from '@/types/database';
 import crypto from 'crypto';
+import { logActivity } from './activity-log';
 
 export async function getLeads(filters?: { status?: string; search?: string }) {
   const supabase = await createClient();
@@ -58,6 +59,15 @@ export async function createLead(data: LeadInsert) {
   if (error) throw new Error(error.message);
 
   revalidatePath('/leads');
+
+  await logActivity({
+    user_id: profile.id,
+    action: 'create_lead',
+    entity_type: 'lead',
+    entity_id: lead.id,
+    details: { name: lead.name, phone: lead.phone },
+  });
+
   return lead;
 }
 
@@ -148,6 +158,14 @@ export async function convertLead(leadId: string, propertyId: string) {
   revalidatePath('/leads');
   revalidatePath('/properties');
   revalidatePath('/tenants');
+
+  await logActivity({
+    user_id: profile.id,
+    action: 'convert_lead',
+    entity_type: 'tenant',
+    entity_id: leadId,
+    details: { name: lead.name, property: property.title },
+  });
 
   return { kycToken };
 }

@@ -85,21 +85,53 @@ export async function createComplaint(data: ComplaintInsert) {
   revalidatePath('/complaints');
 }
 
-export async function updateComplaintStatus(id: string, status: ComplaintStatus, notes?: string, cost?: number) {
+export async function updateComplaint(id: string, data: any) {
   const supabase = await createClient();
-
-  const updateData: Record<string, unknown> = {
-    status,
-    updated_at: new Date().toISOString(),
-  };
-  if (notes) updateData.resolution_notes = notes;
-  if (cost !== undefined) updateData.cost = cost;
 
   const { error } = await supabase
     .from('complaints')
-    .update(updateData)
+    .update({
+      ...data,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', id);
 
   if (error) throw new Error(error.message);
   revalidatePath('/complaints');
 }
+
+export async function resolveComplaint(id: string, notes: string, cost: number, images?: string[]) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('complaints')
+    .update({
+      status: 'resolved',
+      resolution_notes: notes,
+      cost,
+      resolution_images: images,
+      resolved_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id);
+
+  if (error) throw new Error(error.message);
+  revalidatePath('/complaints');
+}
+
+export async function rateComplaint(id: string, rating: number, feedback: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('complaints')
+    .update({
+      tenant_rating: rating,
+      tenant_feedback: feedback,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id);
+
+  if (error) throw new Error(error.message);
+  revalidatePath('/complaints');
+}
+

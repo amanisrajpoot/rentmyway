@@ -41,4 +41,5 @@ export async function recordPayment(data: RentPaymentInsert) {
   if (error) throw new Error(error.message);
 
   revalidatePath('/payments');
+  return { success: true };
 }

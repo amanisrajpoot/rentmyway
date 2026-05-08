@@ -5,6 +5,7 @@ import { Building2, Users, UserCheck, MessageSquareWarning, Clock, AlertCircle, 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { ActivityFeed } from '@/components/layout/activity-feed';
 
 async function getBrokerStats(brokerId: string) {
   const supabase = await createClient();
@@ -309,11 +310,7 @@ export default async function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-8 sm:py-12 text-muted-foreground">
-              <AlertCircle className="h-8 w-8 mx-auto mb-3 opacity-40" />
-              <p className="text-sm font-medium">No activity yet</p>
-              <p className="text-xs mt-1 text-muted-foreground/70">Activity will appear here as you use the platform.</p>
-            </div>
+            <ActivityFeed />
           </CardContent>
         </Card>
       )}

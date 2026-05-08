@@ -4,6 +4,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Separator } from '@/components/ui/separator';
 import { usePathname } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
+import { NotificationBell } from './notification-bell';
 
 const pageNames: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -68,6 +69,9 @@ export function Header() {
         )}
         <span className="font-medium">{breadcrumb.current}</span>
       </nav>
+      <div className="ml-auto flex items-center gap-2">
+        <NotificationBell />
+      </div>
     </header>
   );
 }

@@ -3,7 +3,10 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Building2, Armchair, Calendar, IndianRupee, Phone, Mail } from 'lucide-react';
+import { MapPin, Building2, Armchair, Calendar, IndianRupee, Phone, Mail, Wrench, Zap, MessageSquareWarning } from 'lucide-react';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { MoveOutDialog } from '@/components/tenant/move-out-dialog';
 import { PROPERTY_TYPE_LABELS, FURNISHING_LABELS } from '@/types/database';
 
 export default async function TenantPropertyPage() {
@@ -13,14 +16,16 @@ export default async function TenantPropertyPage() {
   const supabase = await createClient();
 
   // Find active tenant record by email
-  const { data: tenants } = await supabase
+  const { data: tenant } = await supabase
     .from('tenants')
-    .select('*, property:properties(*, broker:profiles!properties_broker_id_fkey(full_name, phone, email))')
+    .select(`
+      *, 
+      property:properties(*, broker:profiles!properties_broker_id_fkey(full_name, phone, email)),
+      leases:lease_agreements(*)
+    `)
     .eq('email', profile.email)
     .eq('is_active', true)
     .single();
-
-  const tenant = tenants;
 
   if (!tenant || !tenant.property) {
     return (
@@ -174,6 +179,51 @@ export default async function TenantPropertyPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Emergency Contacts */}
+          <Card className="border-border/50">
+            <CardHeader className="pb-3 border-b border-border/40">
+              <CardTitle className="text-base flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                Emergency Contacts
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-3">
+              <div className="flex items-center justify-between p-2 rounded-lg bg-muted/30">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Wrench className="h-4 w-4 text-muted-foreground" />
+                  Plumber
+                </div>
+                <a href="tel:+" className="text-sm text-primary font-bold hover:underline">Call Now</a>
+              </div>
+              <div className="flex items-center justify-between p-2 rounded-lg bg-muted/30">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Zap className="h-4 w-4 text-muted-foreground" />
+                  Electrician
+                </div>
+                <a href="tel:+" className="text-sm text-primary font-bold hover:underline">Call Now</a>
+              </div>
+              <div className="p-2 rounded-lg bg-muted/20 border border-dashed border-border/60 text-center">
+                <p className="text-[10px] text-muted-foreground">Ask broker to add more contacts</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Actions */}
+          <div className="space-y-3">
+            <Link href="/complaints/new">
+              <Button className="w-full bg-amber-500 hover:bg-amber-600 text-white gap-2">
+                <MessageSquareWarning className="h-4 w-4" />
+                File a Complaint
+              </Button>
+            </Link>
+            <MoveOutDialog 
+              tenantId={tenant.id}
+              propertyId={property.id}
+              brokerId={property.broker_id}
+              noticePeriodDays={(tenant.leases as any[])?.find(l => l.status === 'active')?.notice_period_days || 30}
+            />
+          </div>
         </div>
       </div>
     </div>

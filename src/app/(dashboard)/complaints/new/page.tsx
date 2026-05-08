@@ -14,6 +14,7 @@ import { Loader2, Save, MessageSquareWarning, AlertTriangle, Camera } from 'luci
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { MediaUploader } from '@/components/ui/media-uploader';
+import { COMPLAINT_CATEGORY_LABELS } from '@/types/database';
 import { VoiceAssistant } from '@/components/ui/voice-assistant';
 
 export default function NewComplaintPage() {
@@ -27,6 +28,7 @@ export default function NewComplaintPage() {
   const [selectedProperty, setSelectedProperty] = useState('');
   const [selectedTenant, setSelectedTenant] = useState('');
   const [priority, setPriority] = useState('medium');
+  const [category, setCategory] = useState('other');
   const [images, setImages] = useState<string[]>([]);
 
   useEffect(() => {
@@ -120,7 +122,8 @@ export default function NewComplaintPage() {
         broker_id: prop?.broker_id || '',
         utility_id: null,
         status: 'open',
-        priority: priority as 'low' | 'medium' | 'high' | 'urgent',
+        priority: priority as any,
+        category: category as any,
         resolution_notes: null,
         cost: null,
         images: images.length > 0 ? images : null,
@@ -202,22 +205,38 @@ export default function NewComplaintPage() {
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label className="flex items-center gap-1.5">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                Priority
-              </Label>
-              <Select value={priority} onValueChange={(val) => setPriority(val ?? 'medium')}>
-                <SelectTrigger className="bg-background/50 w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="urgent">Urgent</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  Priority
+                </Label>
+                <Select value={priority} onValueChange={(val) => setPriority(val ?? 'medium')}>
+                  <SelectTrigger className="bg-background/50 w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Select value={category} onValueChange={(val) => setCategory(val ?? 'other')}>
+                  <SelectTrigger className="bg-background/50 w-full">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(COMPLAINT_CATEGORY_LABELS).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardContent>
         </Card>

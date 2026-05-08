@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { updateComplaintStatus } from '@/lib/actions/complaints';
+import { updateComplaint } from '@/lib/actions/complaints';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import {
@@ -45,7 +45,7 @@ export function ComplaintsClient({ initialComplaints }: { initialComplaints: Com
 
   async function handleStatusUpdate(id: string, newStatus: string) {
     try {
-      await updateComplaintStatus(id, newStatus as Complaint['status']);
+      await updateComplaint(id, { status: newStatus });
       toast.success(`Status updated to ${COMPLAINT_STATUS_LABELS[newStatus as keyof typeof COMPLAINT_STATUS_LABELS]}`);
     } catch {
       toast.error('Failed to update');
@@ -113,6 +113,9 @@ export function ComplaintsClient({ initialComplaints }: { initialComplaints: Com
                     </div>
 
                     <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                      <Badge variant="outline" className="text-[10px] uppercase">
+                        {complaint.category || 'Other'}
+                      </Badge>
                       {complaint.tenant && (
                         <span className="flex items-center gap-1">
                           <User className="h-3 w-3" /> {complaint.tenant.name}
@@ -123,26 +126,33 @@ export function ComplaintsClient({ initialComplaints }: { initialComplaints: Com
                           <Building2 className="h-3 w-3" /> {complaint.property.title}
                         </span>
                       )}
-                      {complaint.utility && (
-                        <span className="flex items-center gap-1">
-                          <Wrench className="h-3 w-3" /> {complaint.utility.name}
-                          {complaint.utility.location && ` (${complaint.utility.location})`}
-                        </span>
-                      )}
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" /> {format(new Date(complaint.created_at), 'dd MMM yyyy')}
                       </span>
                     </div>
 
-                    {complaint.images && complaint.images.length > 0 && (
-                      <div className="flex gap-2 py-1 overflow-x-auto">
-                        {complaint.images.map((url, i) => (
-                          <div key={i} className="h-16 w-24 shrink-0 rounded border overflow-hidden bg-muted">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={url} alt="Attachment" className="w-full h-full object-cover" />
-                          </div>
-                        ))}
+                    {complaint.assigned_to ? (
+                      <div className="p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/10 flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-xs">
+                          <Wrench className="h-3.5 w-3.5 text-emerald-400" />
+                          <span className="text-muted-foreground">Assigned to:</span>
+                          <span className="font-medium text-foreground">{complaint.assigned_to}</span>
+                        </div>
+                        {complaint.assigned_phone && (
+                          <a href={`tel:${complaint.assigned_phone}`} className="text-[10px] text-primary hover:underline">
+                            Call Vendor
+                          </a>
+                        )}
                       </div>
+                    ) : (
+                      complaint.status !== 'resolved' && complaint.status !== 'closed' && (
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/20 border border-dashed border-border/40">
+                          <p className="text-[10px] text-muted-foreground flex-1">No vendor assigned</p>
+                          <Button variant="ghost" size="icon-sm" className="h-6 w-6 text-primary">
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )
                     )}
 
                     {complaint.status !== 'closed' && (
@@ -164,7 +174,7 @@ export function ComplaintsClient({ initialComplaints }: { initialComplaints: Com
                             className="h-7 text-xs text-emerald-400"
                             onClick={() => handleStatusUpdate(complaint.id, 'resolved')}
                           >
-                            <CheckCircle className="h-3 w-3 mr-1" /> Resolve
+                            <CheckCircle className="h-3.5 w-3.5 mr-1" /> Resolve
                           </Button>
                         )}
                         {complaint.status === 'resolved' && (
@@ -174,7 +184,7 @@ export function ComplaintsClient({ initialComplaints }: { initialComplaints: Com
                             className="h-7 text-xs"
                             onClick={() => handleStatusUpdate(complaint.id, 'closed')}
                           >
-                            <XCircle className="h-3 w-3 mr-1" /> Close
+                            <XCircle className="h-3.5 w-3.5 mr-1" /> Close
                           </Button>
                         )}
                       </div>
