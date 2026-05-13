@@ -53,7 +53,7 @@ export const navConfig: NavGroup[] = [
         title: 'Properties',
         href: '/properties',
         icon: Building2,
-        roles: ['broker'],
+        roles: ['broker', 'tenant'],
       },
       {
         title: 'Owners',

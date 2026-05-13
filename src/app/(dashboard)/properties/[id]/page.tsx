@@ -11,6 +11,7 @@ import {
   Building2, MapPin, IndianRupee, Edit, ArrowLeft,
   Ruler, Layers, Compass, Car, PawPrint, Utensils, Users,
 } from 'lucide-react';
+import MapViewWrapper from '@/components/ui/map-view-wrapper';
 
 const statusColors: Record<string, string> = {
   draft: 'bg-muted text-muted-foreground',
@@ -151,12 +152,15 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
                 Address
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm">{property.address}</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {property.locality}, {property.city}, {property.state}
-                {property.pincode && ` - ${property.pincode}`}
-              </p>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm">{property.address}</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {property.locality}, {property.city}, {property.state}
+                  {property.pincode && ` - ${property.pincode}`}
+                </p>
+              </div>
+              <MapViewWrapper address={property.address} locality={property.locality} city={property.city} />
             </CardContent>
           </Card>
         </div>

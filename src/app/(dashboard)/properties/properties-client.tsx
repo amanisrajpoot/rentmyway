@@ -34,7 +34,7 @@ const statusColors: Record<string, string> = {
   rented: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
 };
 
-export function PropertiesClient({ initialProperties }: { initialProperties: Property[] }) {
+export function PropertiesClient({ initialProperties, userRole }: { initialProperties: Property[], userRole: string }) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -83,12 +83,14 @@ export function PropertiesClient({ initialProperties }: { initialProperties: Pro
             {filtered.length} {filtered.length === 1 ? 'property' : 'properties'} found
           </p>
         </div>
-        <Link href="/properties/new">
-          <Button className="bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white shadow-lg shadow-primary/20">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Property
-          </Button>
-        </Link>
+        {userRole === 'broker' && (
+          <Link href="/properties/new">
+            <Button className="bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white shadow-lg shadow-primary/20">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Property
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Filters */}
@@ -141,7 +143,7 @@ export function PropertiesClient({ initialProperties }: { initialProperties: Pro
                 ? 'Try adjusting your filters to find what you\'re looking for.'
                 : 'Get started by adding your first rental property.'}
             </p>
-            {!search && statusFilter === 'all' && typeFilter === 'all' && (
+            {!search && statusFilter === 'all' && typeFilter === 'all' && userRole === 'broker' && (
               <Link href="/properties/new" className="inline-block mt-4">
                 <Button variant="outline" size="sm">
                   <Plus className="h-4 w-4 mr-2" />
@@ -194,25 +196,29 @@ export function PropertiesClient({ initialProperties }: { initialProperties: Pro
                       <DropdownMenuItem onClick={() => window.location.href = `/properties/${property.id}`}>
                         View Details
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => window.location.href = `/properties/${property.id}/edit`}>
-                        Edit Property
-                      </DropdownMenuItem>
-                      {property.status === 'available' && (
-                        <DropdownMenuItem onClick={() => handleStatusChange(property.id, 'rent')}>
-                          Mark as Rented
-                        </DropdownMenuItem>
+                      {userRole === 'broker' && (
+                        <>
+                          <DropdownMenuItem onClick={() => window.location.href = `/properties/${property.id}/edit`}>
+                            Edit Property
+                          </DropdownMenuItem>
+                          {property.status === 'available' && (
+                            <DropdownMenuItem onClick={() => handleStatusChange(property.id, 'rent')}>
+                              Mark as Rented
+                            </DropdownMenuItem>
+                          )}
+                          {property.status === 'rented' && (
+                            <DropdownMenuItem onClick={() => handleStatusChange(property.id, 'available')}>
+                              Mark as Available
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => handleDelete(property.id)}
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        </>
                       )}
-                      {property.status === 'rented' && (
-                        <DropdownMenuItem onClick={() => handleStatusChange(property.id, 'available')}>
-                          Mark as Available
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuItem
-                        variant="destructive"
-                        onClick={() => handleDelete(property.id)}
-                      >
-                        Delete
-                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>

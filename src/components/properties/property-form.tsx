@@ -84,7 +84,7 @@ export function PropertyForm({ owners: initialOwners, property }: PropertyFormPr
     setLoading(true);
 
     try {
-      const payload = {
+      const payload: Record<string, any> = {
         ...form,
         rent: parseFloat(form.rent) || 0,
         deposit: parseFloat(form.deposit) || 0,
@@ -96,18 +96,18 @@ export function PropertyForm({ owners: initialOwners, property }: PropertyFormPr
         facing: form.facing || null,
         description: form.description || null,
         images: form.images.length > 0 ? form.images : null,
-        broker_id: '', // overwritten by server action
       };
 
       if (property) {
-        await updateProperty(property.id, payload);
+        const { broker_id, ...updatePayload } = payload;
+        await updateProperty(property.id, updatePayload);
         toast.success('Property updated successfully');
+        router.push(`/properties/${property.id}`);
       } else {
-        await createProperty(payload);
+        const newProperty = await createProperty(payload as any);
         toast.success('Property created successfully');
+        router.push(`/properties/${newProperty.id}`);
       }
-
-      router.push('/properties');
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong');
     } finally {

@@ -17,9 +17,45 @@ export async function getProperties(filters?: {
 
   let query = supabase
     .from('properties')
-    .select('*, owner:owners(*)')
-    .eq('broker_id', profile.id)
-    .order('created_at', { ascending: false });
+    .select('*, owner:owners(*)');
+
+  if (profile.role === 'broker') {
+    query = query.eq('broker_id', profile.id);
+  } else if (profile.role === 'tenant') {
+    // Find the broker for this tenant
+    const { data: tenantData } = await supabase
+      .from('tenants')
+      .select('broker_id')
+      .eq('profile_id', profile.id)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    let brokerId = tenantData?.broker_id;
+
+    // Fallback to email if profile_id didn't work
+    if (!brokerId && profile.email) {
+      const { data: tenantByEmail } = await supabase
+        .from('tenants')
+        .select('broker_id')
+        .eq('email', profile.email)
+        .eq('is_active', true)
+        .maybeSingle();
+      brokerId = tenantByEmail?.broker_id;
+    }
+
+    if (brokerId) {
+      query = query.eq('broker_id', brokerId).eq('status', 'available');
+    } else {
+      return []; // No broker found for tenant
+    }
+  } else if (profile.role === 'owner') {
+    // Owners see their own properties
+    const { data: owners } = await supabase.from('owners').select('id').eq('email', profile.email);
+    const ownerIds = owners?.map(o => o.id) || [];
+    query = query.in('owner_id', ownerIds);
+  }
+
+  query = query.order('created_at', { ascending: false });
 
   if (filters?.status && filters.status !== 'all') {
     query = query.eq('status', filters.status);
@@ -96,9 +132,17 @@ export async function updateProperty(id: string, data: PropertyUpdate) {
     throw new Error('At least one property image is mandatory for a listing.');
   }
 
+  const updatePayload: Record<string, any> = { ...data, updated_at: new Date().toISOString() };
+  if (updatePayload.broker_id === '') {
+    delete updatePayload.broker_id;
+  }
+  if (updatePayload.owner_id === '') {
+    delete updatePayload.owner_id;
+  }
+
   const { error } = await supabase
     .from('properties')
-    .update({ ...data, updated_at: new Date().toISOString() })
+    .update(updatePayload)
     .eq('id', id);
 
   if (error) throw new Error(error.message);

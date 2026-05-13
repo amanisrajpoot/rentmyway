@@ -23,7 +23,7 @@ export async function getLeases(filters?: { status?: string; search?: string }) 
     const { data: owners } = await supabase
       .from('owners')
       .select('id')
-      .eq('email', profile.email);
+      .or(`profile_id.eq.${profile.id},email.eq.${profile.email}`);
     const ownerIds = owners?.map(o => o.id) || [];
     if (ownerIds.length === 0) return [];
 

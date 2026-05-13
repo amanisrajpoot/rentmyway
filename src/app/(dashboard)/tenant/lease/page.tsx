@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { format, differenceInDays } from 'date-fns';
 import {
   ScrollText, IndianRupee, Calendar, TrendingUp, Clock,
-  Shield, Building2, AlertTriangle, CheckCircle,
+  Shield, Building2, AlertTriangle, CheckCircle, CalendarClock,
 } from 'lucide-react';
 import { LEASE_STATUS_LABELS, PAYMENT_STATUS_LABELS } from '@/types/database';
 
@@ -54,6 +54,8 @@ export default async function TenantLeasePage() {
   }
 
   const daysLeft = differenceInDays(new Date(lease.end_date), new Date());
+  const weeksLeft = Math.max(0, Math.floor(daysLeft / 7));
+  const remainingDays = Math.max(0, daysLeft % 7);
   const isExpiring = daysLeft <= 30 && daysLeft >= 0;
   const leaseDurationMonths = Math.round(differenceInDays(new Date(lease.end_date), new Date(lease.start_date)) / 30);
 
@@ -122,6 +124,35 @@ export default async function TenantLeasePage() {
         </div>
       )}
 
+      {/* Countdown Timer Card */}
+      <Card className="border-primary/20 bg-primary/5 overflow-hidden">
+        <div className="p-6 flex flex-col sm:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center">
+              <CalendarClock className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-bold text-lg">Lease Countdown</h3>
+              <p className="text-sm text-muted-foreground">Time remaining until lease expiration</p>
+            </div>
+          </div>
+          <div className="flex gap-4">
+            <div className="text-center">
+              <div className="bg-background border rounded-xl p-3 min-w-[80px]">
+                <p className="text-2xl font-bold text-primary">{weeksLeft}</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Weeks</p>
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="bg-background border rounded-xl p-3 min-w-[80px]">
+                <p className="text-2xl font-bold text-primary">{remainingDays}</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Days</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 stagger-children">
         {/* Main */}
         <div className="lg:col-span-2 space-y-6">
@@ -154,7 +185,7 @@ export default async function TenantLeasePage() {
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Remaining</p>
                   <p className={`font-medium text-sm ${daysLeft <= 30 ? 'text-amber-400' : ''}`}>
-                    {daysLeft > 0 ? `${daysLeft} days` : 'Expired'}
+                    {daysLeft > 0 ? `${weeksLeft}w ${remainingDays}d` : 'Expired'}
                   </p>
                 </div>
                 <div>

@@ -48,7 +48,13 @@ export default function NewComplaintPage() {
           .order('title');
         setProperties(props || []);
       } else if (profile.role === 'owner') {
-        const { data: owners } = await supabase.from('owners').select('id').eq('email', profile.email);
+        // Find owner record(s) by profile_id or email
+        let { data: owners } = await supabase.from('owners').select('id').eq('profile_id', profile.id);
+        if (!owners || owners.length === 0) {
+          const { data: ownersByEmail } = await supabase.from('owners').select('id').eq('email', profile.email);
+          owners = ownersByEmail;
+        }
+        
         const ownerIds = owners?.map(o => o.id) || [];
         if (ownerIds.length > 0) {
           const { data: props } = await supabase
@@ -60,7 +66,24 @@ export default function NewComplaintPage() {
           setProperties(props || []);
         }
       } else if (profile.role === 'tenant') {
-        const { data: tnt } = await supabase.from('tenants').select('id, property_id, property:properties(broker_id)').eq('email', profile.email).eq('is_active', true).single();
+        // Find tenant record by profile_id or email
+        let { data: tnt } = await supabase
+          .from('tenants')
+          .select('id, property_id, property:properties(broker_id)')
+          .eq('profile_id', profile.id)
+          .eq('is_active', true)
+          .maybeSingle();
+        
+        if (!tnt && profile.email) {
+          const { data: tntByEmail } = await supabase
+            .from('tenants')
+            .select('id, property_id, property:properties(broker_id)')
+            .eq('email', profile.email)
+            .eq('is_active', true)
+            .maybeSingle();
+          tnt = tntByEmail as any;
+        }
+
         if (tnt) {
           setSelectedTenant(tnt.id);
           setSelectedProperty(tnt.property_id);
