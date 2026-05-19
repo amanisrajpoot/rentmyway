@@ -12,6 +12,7 @@ import {
   Ruler, Layers, Compass, Car, PawPrint, Utensils, Users,
 } from 'lucide-react';
 import MapViewWrapper from '@/components/ui/map-view-wrapper';
+import { MediaDisplay } from '@/components/ui/media-display';
 
 const statusColors: Record<string, string> = {
   draft: 'bg-muted text-muted-foreground',
@@ -65,19 +66,18 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
             {property.images && property.images.length > 0 ? (
               <div className="space-y-4 p-4 bg-muted/30">
                 <div className="h-96 w-full rounded-lg overflow-hidden relative border bg-black/5">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img 
-                    src={property.images[0]} 
+                  <MediaDisplay
+                    url={property.images[0]} 
                     alt={property.title}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain bg-black"
+                    controls={true}
                   />
                 </div>
                 {property.images.length > 1 && (
                   <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                     {property.images.slice(1).map((url: string, idx: number) => (
-                      <div key={idx} className="h-20 w-32 shrink-0 rounded-md overflow-hidden border bg-black/5">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={url} alt={`Property view ${idx + 2}`} className="w-full h-full object-cover" />
+                      <div key={idx} className="h-20 w-32 shrink-0 rounded-md overflow-hidden border bg-black/5 cursor-pointer hover:opacity-80 transition-opacity">
+                        <MediaDisplay url={url} alt={`Property view ${idx + 2}`} className="w-full h-full object-cover" />
                       </div>
                     ))}
                   </div>

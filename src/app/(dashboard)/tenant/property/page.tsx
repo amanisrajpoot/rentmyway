@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { MoveOutDialog } from '@/components/tenant/move-out-dialog';
 import { PROPERTY_TYPE_LABELS, FURNISHING_LABELS } from '@/types/database';
+import { MediaDisplay } from '@/components/ui/media-display';
 
 export default async function TenantPropertyPage() {
   const profile = await getUserProfile();
@@ -60,11 +61,12 @@ export default async function TenantPropertyPage() {
           <Card className="border-border/50 overflow-hidden">
             <div className="h-48 sm:h-64 bg-gradient-to-br from-primary/10 via-primary/5 to-chart-2/10 flex items-center justify-center relative">
               {property.images && property.images.length > 0 ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img 
-                  src={property.images[0]} 
+                <MediaDisplay 
+                  url={property.images[0]} 
                   alt={property.title}
                   className="w-full h-full object-cover"
+                  autoPlayHover={true}
+                  controls={true}
                 />
               ) : (
                 <Building2 className="h-16 w-16 text-muted-foreground/15" />

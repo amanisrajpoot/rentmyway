@@ -12,7 +12,8 @@ export async function uploadMedia(file: File, bucket: string = 'media'): Promise
     .from(bucket)
     .upload(filePath, file, {
       cacheControl: '3600',
-      upsert: false
+      upsert: false,
+      contentType: file.type
     });
 
   if (error) {

@@ -14,6 +14,7 @@ import {
   Building2, Clock, Sparkles, ExternalLink, Mic
 } from 'lucide-react';
 import { AddFollowUpDialog } from '@/components/leads/add-follow-up';
+import { MediaDisplay } from '@/components/ui/media-display';
 
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -166,22 +167,14 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               <CardContent>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                   {lead.images.map((url: string, idx: number) => {
-                    const isAudio = url.match(/\.(mp3|wav|ogg)$/i) || url.includes('/audio/');
-                    const isVideo = url.match(/\.(mp4|webm|ogg)$/i) || url.includes('/video/');
-                    
                     return (
                       <div key={idx} className="relative group rounded-md border overflow-hidden bg-muted aspect-video flex items-center justify-center">
-                        {isAudio ? (
-                          <div className="flex flex-col items-center gap-2">
-                            <Mic className="h-6 w-6 text-primary" />
-                            <audio src={url} controls className="w-full scale-75 origin-center" />
-                          </div>
-                        ) : isVideo ? (
-                          <video src={url} controls className="w-full h-full object-cover" />
-                        ) : (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={url} alt="Lead media" className="w-full h-full object-cover" />
-                        )}
+                        <MediaDisplay 
+                          url={url} 
+                          alt="Lead media" 
+                          className="w-full h-full object-cover" 
+                          controls={true}
+                        />
                         <a 
                           href={url} 
                           target="_blank" 

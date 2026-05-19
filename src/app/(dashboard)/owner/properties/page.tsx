@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Building2, Armchair } from 'lucide-react';
 import { PROPERTY_TYPE_LABELS, FURNISHING_LABELS, type Property } from '@/types/database';
+import { MediaDisplay } from '@/components/ui/media-display';
 
 const statusColors: Record<string, string> = {
   draft: 'bg-muted text-muted-foreground',
@@ -73,11 +74,11 @@ export default async function OwnerPropertiesPage() {
             <Card key={property.id} className="border-border/50 overflow-hidden group">
               <div className="h-36 sm:h-40 bg-gradient-to-br from-primary/10 via-primary/5 to-chart-2/10 flex items-center justify-center relative overflow-hidden">
                 {property.images && property.images.length > 0 ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img 
-                    src={property.images[0]} 
+                  <MediaDisplay 
+                    url={property.images[0]} 
                     alt={property.title}
                     className="w-full h-full object-cover"
+                    autoPlayHover={true}
                   />
                 ) : (
                   <Building2 className="h-10 w-10 text-muted-foreground/15" />

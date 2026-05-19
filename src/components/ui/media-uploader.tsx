@@ -5,6 +5,7 @@ import { uploadMedia, deleteMedia } from '@/lib/supabase/storage';
 import { Button } from '@/components/ui/button';
 import { Loader2, UploadCloud, X, FileVideo, FileAudio, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import { MediaDisplay } from '@/components/ui/media-display';
 
 interface MediaUploaderProps {
   value: string[];
@@ -39,9 +40,9 @@ export function MediaUploader({
 
     try {
       for (const file of files) {
-        // Enforce basic size limit (e.g., 50MB)
-        if (file.size > 50 * 1024 * 1024) {
-          toast.error(`${file.name} is too large (max 50MB)`);
+        // Enforce basic size limit (e.g., 200MB for media)
+        if (file.size > 200 * 1024 * 1024) {
+          toast.error(`${file.name} is too large (max 200MB)`);
           continue;
         }
 
@@ -75,30 +76,13 @@ export function MediaUploader({
   };
 
   const renderPreview = (url: string) => {
-    const isVideo = url.match(/\.(mp4|webm|ogg)$/i) || url.includes('/video/');
-    const isAudio = url.match(/\.(mp3|wav|ogg)$/i) || url.includes('/audio/');
-
-    if (isVideo) {
-      return (
-        <div className="relative w-full h-24 bg-black/5 rounded-md flex items-center justify-center overflow-hidden group">
-          <FileVideo className="h-8 w-8 text-muted-foreground" />
-          <video src={url} className="absolute inset-0 w-full h-full object-cover opacity-50 group-hover:opacity-100 transition-opacity" muted loop playsInline onMouseEnter={(e) => e.currentTarget.play()} onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }} />
-        </div>
-      );
-    }
-    
-    if (isAudio) {
-      return (
-        <div className="w-full h-24 bg-black/5 rounded-md flex items-center justify-center">
-          <FileAudio className="h-8 w-8 text-muted-foreground" />
-        </div>
-      );
-    }
-
-    // Default to image
     return (
-      <div className="w-full h-24 relative rounded-md overflow-hidden bg-black/5 flex items-center justify-center">
-        <img src={url} alt="Uploaded media" className="absolute inset-0 w-full h-full object-cover" />
+      <div className="relative w-full h-24 bg-black/5 rounded-md flex items-center justify-center overflow-hidden group">
+        <MediaDisplay 
+          url={url} 
+          className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+          autoPlayHover={true}
+        />
       </div>
     );
   };

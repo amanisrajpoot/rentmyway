@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { markPropertyAsRented, markPropertyAsAvailable, deleteProperty } from '@/lib/actions/properties';
 import { toast } from 'sonner';
+import { MediaDisplay } from '@/components/ui/media-display';
 
 const statusColors: Record<string, string> = {
   draft: 'bg-muted text-muted-foreground',
@@ -164,11 +165,11 @@ export function PropertiesClient({ initialProperties, userRole }: { initialPrope
               <Link href={`/properties/${property.id}`}>
                 <div className="h-36 sm:h-40 bg-gradient-to-br from-primary/10 via-primary/5 to-chart-2/10 flex items-center justify-center relative cursor-pointer overflow-hidden">
                   {property.images && property.images.length > 0 ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img 
-                      src={property.images[0]} 
+                    <MediaDisplay 
+                      url={property.images[0]} 
                       alt={property.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                      autoPlayHover={true}
                     />
                   ) : (
                     <Building2 className="h-10 w-10 text-muted-foreground/15" />
