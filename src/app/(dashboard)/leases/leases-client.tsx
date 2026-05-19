@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import type { LeaseAgreement } from '@/types/database';
 import { LEASE_STATUS_LABELS } from '@/types/database';
 import { Card, CardContent } from '@/components/ui/card';
@@ -11,10 +12,13 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format, differenceInDays, isPast } from 'date-fns';
 import {
-  ScrollText, Plus, Search, Building2, User, Calendar,
+  ScrollText, Plus, Search, Building2, Calendar,
   IndianRupee, AlertTriangle, ArrowRight, TrendingUp,
   Clock, CheckCircle, XCircle, RefreshCw,
 } from 'lucide-react';
+import { getLeases } from '@/lib/actions/leases';
+import { InfiniteScroll } from '@/components/ui/infinite-scroll';
+import { toast } from 'sonner';
 
 const statusColors: Record<string, string> = {
   draft: 'bg-muted text-muted-foreground',
@@ -39,28 +43,81 @@ type LeaseWithJoins = LeaseAgreement & {
   property?: { id: string; title: string; locality: string; city: string; rent: number } | null;
 };
 
-export function LeasesClient({ initialLeases }: { initialLeases: LeaseWithJoins[] }) {
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+interface LeasesClientProps {
+  initialLeases: LeaseWithJoins[];
+  stats: {
+    activeCount: number;
+    totalMonthlyRent: number;
+    expiringCount: number;
+  };
+  initialFilters: {
+    search: string;
+    status: string;
+  };
+}
 
-  const filtered = initialLeases.filter((lease) => {
-    const matchesSearch = !search ||
-      lease.tenant?.name?.toLowerCase().includes(search.toLowerCase()) ||
-      lease.property?.title?.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || lease.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+export function LeasesClient({ initialLeases, stats, initialFilters }: LeasesClientProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  // Stats
-  const activeCount = initialLeases.filter(l => l.status === 'active').length;
-  const expiringCount = initialLeases.filter(l => {
-    if (l.status !== 'active') return false;
-    const daysLeft = differenceInDays(new Date(l.end_date), new Date());
-    return daysLeft <= 30 && daysLeft >= 0;
-  }).length;
-  const totalMonthlyRent = initialLeases
-    .filter(l => ['active', 'expiring'].includes(l.status))
-    .reduce((sum, l) => sum + l.monthly_rent, 0);
+  // Local filter states
+  const [search, setSearch] = useState(initialFilters.search);
+  const [statusFilter, setStatusFilter] = useState(initialFilters.status);
+
+  // Paginated/accumulated items
+  const [leases, setLeases] = useState<LeaseWithJoins[]>(initialLeases);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(initialLeases.length >= 12);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Sync state if initialLeases changes (i.e. due to a server-side filter change)
+  useEffect(() => {
+    setLeases(initialLeases);
+    setPage(0);
+    setHasMore(initialLeases.length >= 12);
+  }, [initialLeases]);
+
+  // Debounce search parameters
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      
+      if (search) params.set('search', search);
+      else params.delete('search');
+
+      if (statusFilter !== 'all') params.set('status', statusFilter);
+      else params.delete('status');
+
+      router.replace(`${pathname}?${params.toString()}`);
+    }, 400);
+
+    return () => clearTimeout(handler);
+  }, [search, statusFilter, router, pathname, searchParams]);
+
+  const loadMore = async () => {
+    if (isLoading) return;
+    setIsLoading(true);
+    try {
+      const nextPage = page + 1;
+      const nextLeases = await getLeases({
+        search,
+        status: statusFilter,
+        page: nextPage,
+        limit: 12,
+      });
+
+      if (nextLeases.length < 12) {
+        setHasMore(false);
+      }
+      setLeases((prev) => [...prev, ...(nextLeases as LeaseWithJoins[])]);
+      setPage(nextPage);
+    } catch {
+      toast.error('Failed to load more leases');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -90,7 +147,7 @@ export function LeasesClient({ initialLeases }: { initialLeases: LeaseWithJoins[
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Active Leases</p>
-              <p className="text-2xl font-bold">{activeCount}</p>
+              <p className="text-2xl font-bold">{stats.activeCount}</p>
             </div>
           </CardContent>
         </Card>
@@ -103,12 +160,12 @@ export function LeasesClient({ initialLeases }: { initialLeases: LeaseWithJoins[
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Monthly Revenue</p>
-              <p className="text-2xl font-bold">₹{totalMonthlyRent.toLocaleString('en-IN')}</p>
+              <p className="text-2xl font-bold">₹{stats.totalMonthlyRent.toLocaleString('en-IN')}</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className={`border-border/50 relative overflow-hidden ${expiringCount > 0 ? 'ring-1 ring-amber-500/30' : ''}`}>
+        <Card className={`border-border/50 relative overflow-hidden ${stats.expiringCount > 0 ? 'ring-1 ring-amber-500/30' : ''}`}>
           <div className="absolute inset-0 bg-gradient-to-br from-[oklch(0.60_0.2_25)] to-[oklch(0.55_0.19_10)] opacity-[0.06]" />
           <CardContent className="pt-5 flex items-center gap-4">
             <div className="p-2.5 rounded-xl bg-gradient-to-br from-[oklch(0.60_0.2_25)] to-[oklch(0.55_0.19_10)]">
@@ -116,7 +173,7 @@ export function LeasesClient({ initialLeases }: { initialLeases: LeaseWithJoins[
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Expiring (30d)</p>
-              <p className="text-2xl font-bold">{expiringCount}</p>
+              <p className="text-2xl font-bold">{stats.expiringCount}</p>
             </div>
           </CardContent>
         </Card>
@@ -147,7 +204,7 @@ export function LeasesClient({ initialLeases }: { initialLeases: LeaseWithJoins[
       </div>
 
       {/* Lease List */}
-      {filtered.length === 0 ? (
+      {leases.length === 0 ? (
         <Card className="border-border/50 border-dashed">
           <CardContent className="py-16 text-center">
             <ScrollText className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
@@ -158,92 +215,102 @@ export function LeasesClient({ initialLeases }: { initialLeases: LeaseWithJoins[
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3 stagger-children">
-          {filtered.map((lease) => {
-            const daysLeft = differenceInDays(new Date(lease.end_date), new Date());
-            const isExpiringSoon = daysLeft <= 30 && daysLeft >= 0 && lease.status === 'active';
-            const isExpired = isPast(new Date(lease.end_date)) && lease.status === 'active';
-            const StatusIcon = statusIcons[lease.status] || Clock;
+        <div className="space-y-4">
+          <div className="space-y-3 stagger-children">
+            {leases.map((lease) => {
+              const daysLeft = differenceInDays(new Date(lease.end_date), new Date());
+              const isExpiringSoon = daysLeft <= 30 && daysLeft >= 0 && lease.status === 'active';
+              const isExpired = isPast(new Date(lease.end_date)) && lease.status === 'active';
+              const StatusIcon = statusIcons[lease.status] || Clock;
 
-            return (
-              <Link key={lease.id} href={`/leases/${lease.id}`}>
-                <Card className={`border-border/50 cursor-pointer group hover:border-primary/30 transition-all duration-300 ${
-                  isExpiringSoon ? 'ring-1 ring-amber-500/20' : ''
-                } ${isExpired ? 'ring-1 ring-red-500/20' : ''}`}>
-                  <CardContent className="pt-4">
-                    <div className="flex items-start gap-4">
-                      {/* Status Icon */}
-                      <div className={`p-2 rounded-lg bg-muted shrink-0 ${
-                        isExpiringSoon ? 'text-amber-400' :
-                        isExpired ? 'text-red-400' :
-                        lease.status === 'active' ? 'text-emerald-400' :
-                        'text-muted-foreground'
-                      }`}>
-                        <StatusIcon className="h-4 w-4" />
-                      </div>
+              return (
+                <Link key={lease.id} href={`/leases/${lease.id}`}>
+                  <Card className={`border-border/50 cursor-pointer group hover:border-primary/30 transition-all duration-300 ${
+                    isExpiringSoon ? 'ring-1 ring-amber-500/20' : ''
+                  } ${isExpired ? 'ring-1 ring-red-500/20' : ''}`}>
+                    <CardContent className="pt-4">
+                      <div className="flex items-start gap-4">
+                        {/* Status Icon */}
+                        <div className={`p-2 rounded-lg bg-muted shrink-0 ${
+                          isExpiringSoon ? 'text-amber-400' :
+                          isExpired ? 'text-red-400' :
+                          lease.status === 'active' ? 'text-emerald-400' :
+                          'text-muted-foreground'
+                        }`}>
+                          <StatusIcon className="h-4 w-4" />
+                        </div>
 
-                      {/* Main Info */}
-                      <div className="flex-1 min-w-0 space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <h3 className="font-semibold group-hover:text-primary transition-colors">
-                              {lease.tenant?.name || 'Unknown Tenant'}
-                            </h3>
-                            <div className="flex flex-wrap gap-3 text-xs text-muted-foreground mt-1">
-                              {lease.property && (
+                        {/* Main Info */}
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <h3 className="font-semibold group-hover:text-primary transition-colors">
+                                {lease.tenant?.name || 'Unknown Tenant'}
+                              </h3>
+                              <div className="flex flex-wrap gap-3 text-xs text-muted-foreground mt-1">
+                                {lease.property && (
+                                  <span className="flex items-center gap-1">
+                                    <Building2 className="h-3 w-3" />
+                                    {lease.property.title}, {lease.property.locality}
+                                  </span>
+                                )}
                                 <span className="flex items-center gap-1">
-                                  <Building2 className="h-3 w-3" />
-                                  {lease.property.title}, {lease.property.locality}
+                                  <IndianRupee className="h-3 w-3" />
+                                  {lease.monthly_rent.toLocaleString('en-IN')}/mo
                                 </span>
-                              )}
-                              <span className="flex items-center gap-1">
-                                <IndianRupee className="h-3 w-3" />
-                                {lease.monthly_rent.toLocaleString('en-IN')}/mo
-                              </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <Badge className={statusColors[lease.status]}>
+                                {isExpiringSoon ? 'Expiring Soon' :
+                                 isExpired ? 'Expired' :
+                                 LEASE_STATUS_LABELS[lease.status]}
+                              </Badge>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2 shrink-0">
-                            <Badge className={statusColors[lease.status]}>
-                              {isExpiringSoon ? 'Expiring Soon' :
-                               isExpired ? 'Expired' :
-                               LEASE_STATUS_LABELS[lease.status]}
-                            </Badge>
+                          {/* Lease Period */}
+                          <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {format(new Date(lease.start_date), 'dd MMM yy')} → {format(new Date(lease.end_date), 'dd MMM yy')}
+                            </span>
+                            {lease.status === 'active' && (
+                              <span className={`flex items-center gap-1 font-medium ${
+                                daysLeft <= 7 ? 'text-red-400' :
+                                daysLeft <= 30 ? 'text-amber-400' :
+                                'text-muted-foreground'
+                              }`}>
+                                <Clock className="h-3 w-3" />
+                                {daysLeft > 0 ? `${daysLeft} days left` : 'Expired'}
+                              </span>
+                            )}
+                            {lease.escalation_percent > 0 && (
+                              <span className="flex items-center gap-1">
+                                <TrendingUp className="h-3 w-3" />
+                                {lease.escalation_percent}% annual escalation
+                              </span>
+                            )}
                           </div>
                         </div>
 
-                        {/* Lease Period */}
-                        <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {format(new Date(lease.start_date), 'dd MMM yy')} → {format(new Date(lease.end_date), 'dd MMM yy')}
-                          </span>
-                          {lease.status === 'active' && (
-                            <span className={`flex items-center gap-1 font-medium ${
-                              daysLeft <= 7 ? 'text-red-400' :
-                              daysLeft <= 30 ? 'text-amber-400' :
-                              'text-muted-foreground'
-                            }`}>
-                              <Clock className="h-3 w-3" />
-                              {daysLeft > 0 ? `${daysLeft} days left` : 'Expired'}
-                            </span>
-                          )}
-                          {lease.escalation_percent > 0 && (
-                            <span className="flex items-center gap-1">
-                              <TrendingUp className="h-3 w-3" />
-                              {lease.escalation_percent}% annual escalation
-                            </span>
-                          )}
-                        </div>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0 mt-1" />
                       </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
+          </div>
 
-                      <ArrowRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0 mt-1" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
+          <InfiniteScroll
+            hasMore={hasMore}
+            isLoading={isLoading}
+            onLoadMore={loadMore}
+            loadingText="Loading more leases..."
+            endText="All leases loaded"
+          />
         </div>
       )}
     </div>

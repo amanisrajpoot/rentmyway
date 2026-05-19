@@ -5,7 +5,12 @@ import { getUserProfile } from '@/lib/actions/auth';
 import { revalidatePath } from 'next/cache';
 import crypto from 'crypto';
 
-export async function getTenants(filters?: { active?: boolean; search?: string }) {
+export async function getTenants(filters?: {
+  active?: boolean;
+  search?: string;
+  page?: number;
+  limit?: number;
+}) {
   const supabase = await createClient();
   const profile = await getUserProfile();
   if (!profile) return [];
@@ -22,6 +27,13 @@ export async function getTenants(filters?: { active?: boolean; search?: string }
   if (filters?.search) {
     query = query.or(`name.ilike.%${filters.search}%,phone.ilike.%${filters.search}%`);
   }
+
+  // Pagination range
+  const limit = filters?.limit ?? 25;
+  const page = filters?.page ?? 0;
+  const from = page * limit;
+  const to = from + limit - 1;
+  query = query.range(from, to);
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);

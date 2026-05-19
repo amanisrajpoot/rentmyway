@@ -7,7 +7,12 @@ import type { LeadInsert, LeadUpdate, LeadStatus } from '@/types/database';
 import crypto from 'crypto';
 import { logActivity } from './activity-log';
 
-export async function getLeads(filters?: { status?: string; search?: string }) {
+export async function getLeads(filters?: {
+  status?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}) {
   const supabase = await createClient();
   const profile = await getUserProfile();
   if (!profile) return [];
@@ -26,6 +31,13 @@ export async function getLeads(filters?: { status?: string; search?: string }) {
       `name.ilike.%${filters.search}%,phone.ilike.%${filters.search}%`
     );
   }
+
+  // Pagination range
+  const limit = filters?.limit ?? 25;
+  const page = filters?.page ?? 0;
+  const from = page * limit;
+  const to = from + limit - 1;
+  query = query.range(from, to);
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
@@ -49,6 +61,20 @@ export async function createLead(data: LeadInsert) {
   const supabase = await createClient();
   const profile = await getUserProfile();
   if (!profile) throw new Error('Not authenticated');
+
+  // Check for duplicate lead by phone number
+  const { data: existingLead } = await supabase
+    .from('leads')
+    .select('id, name, phone, status')
+    .eq('broker_id', profile.id)
+    .eq('phone', data.phone)
+    .maybeSingle();
+
+  if (existingLead) {
+    throw new Error(
+      `A lead with phone ${data.phone} already exists: "${existingLead.name}" (${existingLead.status}). Please update the existing lead instead.`
+    );
+  }
 
   const { data: lead, error } = await supabase
     .from('leads')
@@ -212,3 +238,20 @@ export async function deleteLead(id: string) {
 
   revalidatePath('/leads');
 }
+
+export async function getBrokerSiteVisits() {
+  const supabase = await createClient();
+  const profile = await getUserProfile();
+  if (!profile) return [];
+
+  const { data, error } = await supabase
+    .from('lead_follow_ups')
+    .select('*, lead:leads(name, phone, email, preferred_locality, preferred_city)')
+    .eq('broker_id', profile.id)
+    .eq('type', 'site_visit')
+    .order('follow_up_date', { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+

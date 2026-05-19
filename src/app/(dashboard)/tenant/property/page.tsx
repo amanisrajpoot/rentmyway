@@ -46,6 +46,15 @@ export default async function TenantPropertyPage() {
   // Use the broker profile that was joined with the property
   const broker = property.broker;
 
+  // Fetch maintenance schedule connected to this property
+  const { data: maintenance } = await supabase
+    .from('maintenance_schedule')
+    .select('*')
+    .eq('property_id', property.id)
+    .order('next_due', { ascending: true });
+
+  const maintenanceList = maintenance || [];
+
   return (
     <div className="space-y-6 sm:space-y-8 animate-fade-in">
       <div>
@@ -56,7 +65,7 @@ export default async function TenantPropertyPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 stagger-children">
-        {/* Left Column: Property Info */}
+        {/* Left Column: Property Info & Maintenance */}
         <div className="lg:col-span-2 space-y-6">
           <Card className="border-border/50 overflow-hidden">
             <div className="h-48 sm:h-64 bg-gradient-to-br from-primary/10 via-primary/5 to-chart-2/10 flex items-center justify-center relative">
@@ -109,6 +118,55 @@ export default async function TenantPropertyPage() {
                   <p className="text-sm text-foreground/80 leading-relaxed">
                     {property.description}
                   </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Maintenance & Service Schedules */}
+          <Card className="border-border/50">
+            <CardHeader className="pb-3 border-b border-border/40">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Wrench className="h-4 w-4 text-primary animate-pulse" />
+                Property Maintenance & Service Schedules
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              {maintenanceList.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  No maintenance schedules are currently listed for this property.
+                </p>
+              ) : (
+                <div className="space-y-3.5">
+                  {maintenanceList.map((item: any) => {
+                    const isOverdue = new Date(item.next_due) < new Date();
+                    return (
+                      <div key={item.id} className="flex items-start sm:items-center justify-between p-3.5 rounded-xl bg-muted/20 border border-border/30 gap-4">
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-semibold text-sm capitalize">{item.title || item.task_type || 'Maintenance Task'}</h4>
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{item.description || 'No description provided.'}</p>
+                          <div className="flex items-center gap-2.5 mt-2">
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              Scheduled: {new Date(item.next_due).toLocaleDateString()}
+                            </span>
+                            {item.last_completed && (
+                              <span className="text-[10px] text-emerald-400">
+                                Last completed: {new Date(item.last_completed).toLocaleDateString()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <Badge variant="outline" className={`shrink-0 text-xs px-2.5 py-0.5 capitalize ${
+                          isOverdue 
+                            ? 'bg-red-500/10 text-red-400 border-red-500/25' 
+                            : 'bg-primary/10 text-primary border-primary/25'
+                        }`}>
+                          {isOverdue ? 'overdue' : 'scheduled'}
+                        </Badge>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

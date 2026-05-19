@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import type { Tenant } from '@/types/database';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,21 +11,85 @@ import { Badge } from '@/components/ui/badge';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Search, Eye, UserCheck, IndianRupee, Building2, Phone } from 'lucide-react';
+import { Search, Eye, UserCheck, IndianRupee, Building2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { PhoneLink } from '@/components/ui/phone-link';
+import { getTenants } from '@/lib/actions/tenants';
+import { InfiniteScroll } from '@/components/ui/infinite-scroll';
+import { toast } from 'sonner';
 
-export function TenantsClient({ initialTenants }: { initialTenants: (Tenant & { property?: { id: string; title: string; locality: string; city: string } })[] }) {
-  const [search, setSearch] = useState('');
-  const [showActive, setShowActive] = useState(true);
+type TenantWithProperty = Tenant & { property?: { id: string; title: string; locality: string; city: string } };
 
-  const filtered = initialTenants.filter((t) => {
-    const matchesSearch =
-      !search ||
-      t.name.toLowerCase().includes(search.toLowerCase()) ||
-      t.phone.includes(search);
-    const matchesActive = showActive ? t.is_active : !t.is_active;
-    return matchesSearch && matchesActive;
-  });
+interface TenantsClientProps {
+  initialTenants: TenantWithProperty[];
+  initialFilters: {
+    search: string;
+    active: boolean;
+  };
+}
+
+export function TenantsClient({ initialTenants, initialFilters }: TenantsClientProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Local filter states
+  const [search, setSearch] = useState(initialFilters.search);
+  const [showActive, setShowActive] = useState(initialFilters.active);
+
+  // Paginated/accumulated items
+  const [tenants, setTenants] = useState<TenantWithProperty[]>(initialTenants);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(initialTenants.length >= 12);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Sync state if initialTenants changes (i.e. due to a server-side filter change)
+  useEffect(() => {
+    setTenants(initialTenants);
+    setPage(0);
+    setHasMore(initialTenants.length >= 12);
+  }, [initialTenants]);
+
+  // Debounce search parameters
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      
+      if (search) params.set('search', search);
+      else params.delete('search');
+
+      if (!showActive) params.set('active', 'false');
+      else params.delete('active');
+
+      router.replace(`${pathname}?${params.toString()}`);
+    }, 400);
+
+    return () => clearTimeout(handler);
+  }, [search, showActive, router, pathname, searchParams]);
+
+  const loadMore = async () => {
+    if (isLoading) return;
+    setIsLoading(true);
+    try {
+      const nextPage = page + 1;
+      const nextTenants = await getTenants({
+        search,
+        active: showActive,
+        page: nextPage,
+        limit: 12,
+      });
+
+      if (nextTenants.length < 12) {
+        setHasMore(false);
+      }
+      setTenants((prev) => [...prev, ...(nextTenants as TenantWithProperty[])]);
+      setPage(nextPage);
+    } catch {
+      toast.error('Failed to load more tenants');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -56,14 +121,14 @@ export function TenantsClient({ initialTenants }: { initialTenants: (Tenant & { 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search tenants..."
+          placeholder="Search tenants by name or phone..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-10 bg-card"
         />
       </div>
 
-      {filtered.length === 0 ? (
+      {tenants.length === 0 ? (
         <Card className="border-border/50">
           <CardContent className="py-16 text-center">
             <UserCheck className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
@@ -74,63 +139,73 @@ export function TenantsClient({ initialTenants }: { initialTenants: (Tenant & { 
           </CardContent>
         </Card>
       ) : (
-        <Card className="border-border/50">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tenant</TableHead>
-                <TableHead>Property</TableHead>
-                <TableHead>Rent</TableHead>
-                <TableHead>Move-in</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-12"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((tenant) => (
-                <TableRow key={tenant.id} className="animate-fade-in">
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{tenant.name}</p>
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Phone className="h-3 w-3" /> {tenant.phone}
-                      </p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {tenant.property && (
-                      <div className="flex items-center gap-1.5">
-                        <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-sm">{tenant.property.title}</span>
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <span className="flex items-center gap-0.5">
-                      <IndianRupee className="h-3.5 w-3.5" />
-                      {tenant.rent_amount.toLocaleString('en-IN')}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {format(new Date(tenant.move_in_date), 'dd MMM yyyy')}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={tenant.is_active ? 'default' : 'secondary'}>
-                      {tenant.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Link href={`/tenants/${tenant.id}`}>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </Link>
-                  </TableCell>
+        <div className="space-y-4">
+          <Card className="border-border/50">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tenant</TableHead>
+                  <TableHead>Property</TableHead>
+                  <TableHead>Rent</TableHead>
+                  <TableHead>Move-in</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-12"></TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+              </TableHeader>
+              <TableBody>
+                {tenants.map((tenant) => (
+                  <TableRow key={tenant.id} className="animate-fade-in">
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{tenant.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          <PhoneLink phone={tenant.phone} />
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {tenant.property && (
+                        <div className="flex items-center gap-1.5">
+                          <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-sm">{tenant.property.title}</span>
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <span className="flex items-center gap-0.5">
+                        <IndianRupee className="h-3.5 w-3.5" />
+                        {tenant.rent_amount.toLocaleString('en-IN')}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {format(new Date(tenant.move_in_date), 'dd MMM yyyy')}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={tenant.is_active ? 'default' : 'secondary'}>
+                        {tenant.is_active ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={`/tenants/${tenant.id}`}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+
+          <InfiniteScroll
+            hasMore={hasMore}
+            isLoading={isLoading}
+            onLoadMore={loadMore}
+            loadingText="Loading more tenants..."
+            endText="All tenants loaded"
+          />
+        </div>
       )}
     </div>
   );

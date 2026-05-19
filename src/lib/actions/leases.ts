@@ -5,7 +5,12 @@ import { getUserProfile } from '@/lib/actions/auth';
 import { revalidatePath } from 'next/cache';
 import type { LeaseAgreementInsert, LeaseAgreementUpdate, LeaseStatus } from '@/types/database';
 
-export async function getLeases(filters?: { status?: string; search?: string }) {
+export async function getLeases(filters?: {
+  status?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}) {
   const supabase = await createClient();
   const profile = await getUserProfile();
   if (!profile) return [];
@@ -50,25 +55,39 @@ export async function getLeases(filters?: { status?: string; search?: string }) 
   if (filters?.status && filters.status !== 'all') {
     query = query.eq('status', filters.status);
   }
+
   if (filters?.search) {
-    // Search by tenant name (via joined table) is tricky, filter client-side
+    const s = `%${filters.search}%`;
+    const [tenantsRes, propertiesRes] = await Promise.all([
+      supabase.from('tenants').select('id').ilike('name', s),
+      supabase.from('properties').select('id').ilike('title', s),
+    ]);
+
+    const tenantIds = tenantsRes.data?.map((t) => t.id) || [];
+    const propertyIds = propertiesRes.data?.map((p) => p.id) || [];
+
+    if (tenantIds.length > 0 && propertyIds.length > 0) {
+      query = query.or(`tenant_id.in.(${tenantIds.join(',')}),property_id.in.(${propertyIds.join(',')})`);
+    } else if (tenantIds.length > 0) {
+      query = query.in('tenant_id', tenantIds);
+    } else if (propertyIds.length > 0) {
+      query = query.in('property_id', propertyIds);
+    } else {
+      return [];
+    }
   }
+
+  // Pagination range
+  const limit = filters?.limit ?? 25;
+  const page = filters?.page ?? 0;
+  const from = page * limit;
+  const to = from + limit - 1;
+  query = query.range(from, to);
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
 
-  let results = data || [];
-
-  // Client-side search filter for tenant name
-  if (filters?.search) {
-    const s = filters.search.toLowerCase();
-    results = results.filter((l: any) =>
-      l.tenant?.name?.toLowerCase().includes(s) ||
-      l.property?.title?.toLowerCase().includes(s)
-    );
-  }
-
-  return results;
+  return data || [];
 }
 
 export async function getLease(id: string) {
@@ -210,4 +229,69 @@ export async function getLeaseForTenant(tenantId: string) {
 
   if (error && error.code !== 'PGRST116') throw new Error(error.message);
   return data || null;
+}
+
+export async function getLeaseStats() {
+  const supabase = await createClient();
+  const profile = await getUserProfile();
+  if (!profile) return { activeCount: 0, totalMonthlyRent: 0, expiringCount: 0 };
+
+  let query = supabase
+    .from('lease_agreements')
+    .select('status, monthly_rent, end_date');
+
+  if (profile.role === 'broker') {
+    query = query.eq('broker_id', profile.id);
+  } else if (profile.role === 'owner') {
+    const { data: owners } = await supabase
+      .from('owners')
+      .select('id')
+      .or(`profile_id.eq.${profile.id},email.eq.${profile.email}`);
+    const ownerIds = owners?.map(o => o.id) || [];
+    if (ownerIds.length === 0) return { activeCount: 0, totalMonthlyRent: 0, expiringCount: 0 };
+
+    const { data: properties } = await supabase
+      .from('properties')
+      .select('id')
+      .in('owner_id', ownerIds);
+    const propertyIds = properties?.map(p => p.id) || [];
+    if (propertyIds.length === 0) return { activeCount: 0, totalMonthlyRent: 0, expiringCount: 0 };
+
+    query = query.in('property_id', propertyIds);
+  } else if (profile.role === 'tenant') {
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('id')
+      .or(`profile_id.eq.${profile.id},email.eq.${profile.email}`)
+      .eq('is_active', true)
+      .single();
+    if (!tenant) return { activeCount: 0, totalMonthlyRent: 0, expiringCount: 0 };
+    query = query.eq('tenant_id', tenant.id);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  const leases = data || [];
+  const activeCount = leases.filter(l => l.status === 'active').length;
+  
+  const today = new Date();
+  const future30 = new Date();
+  future30.setDate(today.getDate() + 30);
+  
+  const expiringCount = leases.filter(l => {
+    if (l.status !== 'active') return false;
+    const endDate = new Date(l.end_date);
+    return endDate >= today && endDate <= future30;
+  }).length;
+
+  const totalMonthlyRent = leases
+    .filter(l => ['active', 'expiring'].includes(l.status))
+    .reduce((sum, l) => sum + l.monthly_rent, 0);
+
+  return {
+    activeCount,
+    totalMonthlyRent,
+    expiringCount,
+  };
 }

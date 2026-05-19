@@ -19,14 +19,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { 
   IndianRupee, Banknote, Building2, User, Plus, Loader2, Download,
-  Wallet, CheckCircle2, Clock
+  Wallet, CheckCircle2, Clock, Search, Phone
 } from 'lucide-react';
-import { recordPayment } from '@/lib/actions/payments';
-import { markPayoutAsPaid } from '@/lib/actions/owner-payouts';
+import { recordPayment, getPayments } from '@/lib/actions/payments';
+import { markPayoutAsPaid, getOwnerPayouts } from '@/lib/actions/owner-payouts';
+import { runRentAutomation } from '@/lib/actions/rent-schedule';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { PDFGenerator } from '@/lib/utils/pdf-generator';
 import { cn } from '@/lib/utils';
+import { InfiniteScroll } from '@/components/ui/infinite-scroll';
+import { exportToCSV } from '@/lib/utils/export';
 
 type PaymentWithJoins = RentPayment & {
   tenant?: { name: string; phone: string } | null;
@@ -51,15 +54,27 @@ const modeColors: Record<string, string> = {
 
 export function PaymentsClient({ 
   initialPayments, 
-  initialPayouts 
+  initialPayouts,
+  stats,
+  initialSchedules,
+  initialFilters
 }: { 
-  initialPayments: PaymentWithJoins[],
-  initialPayouts: any[]
+  initialPayments: PaymentWithJoins[];
+  initialPayouts: any[];
+  stats: {
+    totalCollected: number;
+    totalPayouts: number;
+    pendingPayouts: number;
+    totalCollectionsCount: number;
+    totalPayoutsCount: number;
+  };
+  initialSchedules: any[];
+  initialFilters: {
+    search: string;
+    status: string;
+  };
 }) {
   const router = useRouter();
-  const totalCollected = initialPayments.reduce((sum, p) => sum + p.amount, 0);
-  const totalPayouts = initialPayouts.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0);
-  const pendingPayouts = initialPayouts.filter(p => p.status === 'pending').reduce((sum, p) => sum + p.amount, 0);
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -68,6 +83,27 @@ export function PaymentsClient({
   const [selectedTenant, setSelectedTenant] = useState('');
   const [paymentMode, setPaymentMode] = useState('upi');
 
+  // URL search and status state
+  const [search, setSearch] = useState(initialFilters.search);
+  const [statusFilter, setStatusFilter] = useState(initialFilters.status);
+
+  // Collections paginated/accumulated state
+  const [payments, setPayments] = useState<PaymentWithJoins[]>(initialPayments);
+  const [paymentsPage, setPaymentsPage] = useState(0);
+  const [paymentsHasMore, setPaymentsHasMore] = useState(initialPayments.length >= 12);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+
+  // Payouts paginated/accumulated state
+  const [payouts, setPayouts] = useState<any[]>(initialPayouts);
+  const [payoutsPage, setPayoutsPage] = useState(0);
+  const [payoutsHasMore, setPayoutsHasMore] = useState(initialPayouts.length >= 12);
+  const [payoutsLoading, setPayoutsLoading] = useState(false);
+
+  // Rent Schedules state
+  const [schedules, setSchedules] = useState<any[]>(initialSchedules || []);
+  const [runningAutomation, setRunningAutomation] = useState(false);
+
+  // Load active tenants for "Record Payment" modal
   useEffect(() => {
     async function load() {
       const supabase = createClient();
@@ -80,6 +116,135 @@ export function PaymentsClient({
     }
     load();
   }, []);
+
+  // Sync states if server-side props change
+  useEffect(() => {
+    setPayments(initialPayments);
+    setPaymentsPage(0);
+    setPaymentsHasMore(initialPayments.length >= 12);
+  }, [initialPayments]);
+
+  useEffect(() => {
+    setPayouts(initialPayouts);
+    setPayoutsPage(0);
+    setPayoutsHasMore(initialPayouts.length >= 12);
+  }, [initialPayouts]);
+
+  useEffect(() => {
+    setSchedules(initialSchedules || []);
+  }, [initialSchedules]);
+
+  async function handleRunAutomation() {
+    setRunningAutomation(true);
+    try {
+      const res = await runRentAutomation();
+      toast.success(`Automation scan completed! ${res.updatedCount} schedule(s) marked overdue and notifications sent.`);
+      router.refresh();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to trigger reminders automation scan');
+    } finally {
+      setRunningAutomation(false);
+    }
+  }
+
+  const handleExportCSV = () => {
+    if (activeTab === 'collections') {
+      const dataToExport = payments.map((p) => ({
+        Month: p.month_year,
+        Tenant: p.tenant?.name || 'N/A',
+        Property: p.property?.title || 'N/A',
+        Amount: p.amount,
+        Mode: p.payment_mode || 'other',
+        Date: p.payment_date,
+        Notes: p.notes || '',
+      }));
+      exportToCSV(dataToExport, `Rent_Collections_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    } else if (activeTab === 'payouts') {
+      const dataToExport = payouts.map((p) => ({
+        Month: p.for_month,
+        Owner: p.owner?.name || 'N/A',
+        Property: p.property?.title || 'N/A',
+        Amount: p.amount,
+        Status: p.status,
+        Date: p.payment_date || 'N/A',
+      }));
+      exportToCSV(dataToExport, `Owner_Payouts_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    } else {
+      const dataToExport = schedules.map((s) => ({
+        Month: s.month_year,
+        Tenant: s.tenant?.name || 'N/A',
+        Property: s.property?.title || 'N/A',
+        ExpectedAmount: s.expected_amount,
+        DueDate: s.due_date,
+        Status: s.status,
+      }));
+      exportToCSV(dataToExport, `Rent_Schedules_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    }
+  };
+
+  // Debounced URL updates
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      
+      if (search) params.set('search', search);
+      else params.delete('search');
+
+      if (statusFilter !== 'all') params.set('status', statusFilter);
+      else params.delete('status');
+
+      router.replace(`${window.location.pathname}?${params.toString()}`);
+    }, 400);
+
+    return () => clearTimeout(handler);
+  }, [search, statusFilter, router]);
+
+  const loadMorePayments = async () => {
+    if (paymentsLoading) return;
+    setPaymentsLoading(true);
+    try {
+      const nextPage = paymentsPage + 1;
+      const nextPayments = await getPayments({
+        search,
+        page: nextPage,
+        limit: 12,
+      });
+
+      if (nextPayments.length < 12) {
+        setPaymentsHasMore(false);
+      }
+      setPayments((prev) => [...prev, ...(nextPayments as PaymentWithJoins[])]);
+      setPaymentsPage(nextPage);
+    } catch {
+      toast.error('Failed to load more payments');
+    } finally {
+      setPaymentsLoading(false);
+    }
+  };
+
+  const loadMorePayouts = async () => {
+    if (payoutsLoading) return;
+    setPayoutsLoading(true);
+    try {
+      const nextPage = payoutsPage + 1;
+      const nextPayouts = await getOwnerPayouts({
+        search,
+        status: statusFilter,
+        page: nextPage,
+        limit: 12,
+      });
+
+      if (nextPayouts.length < 12) {
+        setPayoutsHasMore(false);
+      }
+      setPayouts((prev) => [...prev, ...nextPayouts]);
+      setPayoutsPage(nextPage);
+    } catch {
+      toast.error('Failed to load more payouts');
+    } finally {
+      setPayoutsLoading(false);
+    }
+  };
 
   const activeTenant = tenants.find(t => t.id === selectedTenant);
 
@@ -131,6 +296,29 @@ export function PaymentsClient({
           </p>
         </div>
         <div className="flex gap-2">
+          <Button 
+            onClick={handleRunAutomation}
+            disabled={runningAutomation}
+            variant="outline"
+            className="border-primary/20 hover:bg-primary/5 text-primary"
+          >
+            {runningAutomation ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Clock className="h-4 w-4 mr-2" />
+            )}
+            Scan & Remind
+          </Button>
+
+          <Button 
+            onClick={handleExportCSV}
+            variant="outline"
+            className="border-primary/20 hover:bg-primary/5 text-primary"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger render={<Button className="bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white" />}>
               <Plus className="h-4 w-4 mr-2" />
@@ -202,14 +390,39 @@ export function PaymentsClient({
         </div>
       </div>
 
+      {/* Global Toolbar for Search & Status Filter */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search financial records..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 bg-card"
+          />
+        </div>
+        {activeTab === 'payouts' && (
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? 'all')}>
+            <SelectTrigger className="w-[160px] bg-card">
+              <SelectValue placeholder="All Payout Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Payout Status</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="bg-card border border-border/50 p-1">
           <TabsTrigger value="collections" className="px-6">Rent Collections</TabsTrigger>
           <TabsTrigger value="payouts" className="px-6">Owner Payouts</TabsTrigger>
+          <TabsTrigger value="schedules" className="px-6">Rent Schedules</TabsTrigger>
         </TabsList>
 
         <TabsContent value="collections" className="space-y-6 outline-none">
-          {/* Summary card */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card className="border-border/50 relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] opacity-[0.06]" />
@@ -222,7 +435,7 @@ export function PaymentsClient({
                     <p className="text-sm text-muted-foreground">Total Collected</p>
                     <p className="text-2xl font-bold flex items-center gap-0.5">
                       <IndianRupee className="h-5 w-5" />
-                      {totalCollected.toLocaleString('en-IN')}
+                      {stats.totalCollected.toLocaleString('en-IN')}
                     </p>
                   </div>
                 </div>
@@ -237,15 +450,14 @@ export function PaymentsClient({
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Transactions</p>
-                    <p className="text-2xl font-bold">{initialPayments.length}</p>
+                    <p className="text-2xl font-bold">{stats.totalCollectionsCount}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Payments table */}
-          {initialPayments.length === 0 ? (
+          {payments.length === 0 ? (
             <Card className="border-border/50 border-dashed">
               <CardContent className="py-20 text-center">
                 <IndianRupee className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
@@ -256,79 +468,89 @@ export function PaymentsClient({
               </CardContent>
             </Card>
           ) : (
-            <Card className="border-border/50 overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Month</TableHead>
-                    <TableHead>Tenant</TableHead>
-                    <TableHead>Property</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Mode</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="w-10"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {initialPayments.map((payment) => (
-                    <TableRow key={payment.id} className="animate-fade-in group">
-                      <TableCell className="font-medium">{payment.month_year}</TableCell>
-                      <TableCell>
-                        {payment.tenant && (
-                          <div className="flex items-center gap-1.5">
-                            <User className="h-3.5 w-3.5 text-muted-foreground" />
-                            <span className="text-sm">{payment.tenant.name}</span>
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {payment.property && (
-                          <div className="flex items-center gap-1.5">
-                            <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                            <span className="text-sm">{payment.property.title}</span>
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-semibold flex items-center gap-0.5">
-                          <IndianRupee className="h-3.5 w-3.5" />
-                          {payment.amount.toLocaleString('en-IN')}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={cn("capitalize font-normal", modeColors[payment.payment_mode || 'other'])}>
-                          {(payment.payment_mode || 'other').replace(/_/g, ' ')}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {format(new Date(payment.payment_date), 'dd MMM yyyy')}
-                      </TableCell>
-                      <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="icon-xs" 
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => PDFGenerator.generateRentReceipt({
-                            receiptNo: payment.id.slice(0, 8).toUpperCase(),
-                            date: format(new Date(payment.payment_date), 'dd MMM yyyy'),
-                            tenantName: payment.tenant?.name || 'N/A',
-                            propertyName: payment.property?.title || 'N/A',
-                            propertyAddress: (payment as any).property?.locality || 'N/A',
-                            amount: payment.amount,
-                            monthYear: payment.month_year,
-                            paymentMode: payment.payment_mode || 'other',
-                            notes: payment.notes || undefined
-                          })}
-                          title="Download Receipt"
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
+            <div className="space-y-4">
+              <Card className="border-border/50 overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Month</TableHead>
+                      <TableHead>Tenant</TableHead>
+                      <TableHead>Property</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Mode</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead className="w-10"></TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {payments.map((payment) => (
+                      <TableRow key={payment.id} className="animate-fade-in group">
+                        <TableCell className="font-medium">{payment.month_year}</TableCell>
+                        <TableCell>
+                          {payment.tenant && (
+                            <div className="flex items-center gap-1.5">
+                              <User className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span className="text-sm">{payment.tenant.name}</span>
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {payment.property && (
+                            <div className="flex items-center gap-1.5">
+                              <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span className="text-sm">{payment.property.title}</span>
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-semibold flex items-center gap-0.5">
+                            <IndianRupee className="h-3.5 w-3.5" />
+                            {payment.amount.toLocaleString('en-IN')}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={cn("capitalize font-normal", modeColors[payment.payment_mode || 'other'])}>
+                            {(payment.payment_mode || 'other').replace(/_/g, ' ')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {format(new Date(payment.payment_date), 'dd MMM yyyy')}
+                        </TableCell>
+                        <TableCell>
+                          <Button 
+                            variant="ghost" 
+                            size="icon-xs" 
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => PDFGenerator.generateRentReceipt({
+                              receiptNo: payment.id.slice(0, 8).toUpperCase(),
+                              date: format(new Date(payment.payment_date), 'dd MMM yyyy'),
+                              tenantName: payment.tenant?.name || 'N/A',
+                              propertyName: payment.property?.title || 'N/A',
+                              propertyAddress: (payment as any).property?.locality || 'N/A',
+                              amount: payment.amount,
+                              monthYear: payment.month_year,
+                              paymentMode: payment.payment_mode || 'other',
+                              notes: payment.notes || undefined
+                            })}
+                            title="Download Receipt"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+
+              <InfiniteScroll
+                hasMore={paymentsHasMore}
+                isLoading={paymentsLoading}
+                onLoadMore={loadMorePayments}
+                loadingText="Loading more collections..."
+                endText="All collections loaded"
+              />
+            </div>
           )}
         </TabsContent>
 
@@ -345,7 +567,7 @@ export function PaymentsClient({
                     <p className="text-sm text-muted-foreground">Total Paid to Owners</p>
                     <p className="text-2xl font-bold flex items-center gap-0.5">
                       <IndianRupee className="h-5 w-5" />
-                      {totalPayouts.toLocaleString('en-IN')}
+                      {stats.totalPayouts.toLocaleString('en-IN')}
                     </p>
                   </div>
                 </div>
@@ -362,7 +584,7 @@ export function PaymentsClient({
                     <p className="text-sm text-muted-foreground">Pending Settlements</p>
                     <p className="text-2xl font-bold flex items-center gap-0.5 text-amber-600">
                       <IndianRupee className="h-5 w-5" />
-                      {pendingPayouts.toLocaleString('en-IN')}
+                      {stats.pendingPayouts.toLocaleString('en-IN')}
                     </p>
                   </div>
                 </div>
@@ -370,7 +592,7 @@ export function PaymentsClient({
             </Card>
           </div>
 
-          {initialPayouts.length === 0 ? (
+          {payouts.length === 0 ? (
             <Card className="border-border/50 border-dashed">
               <CardContent className="py-20 text-center">
                 <Wallet className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
@@ -379,68 +601,231 @@ export function PaymentsClient({
               </CardContent>
             </Card>
           ) : (
-            <Card className="border-border/50 overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>For Month</TableHead>
-                    <TableHead>Owner</TableHead>
-                    <TableHead>Property</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {initialPayouts.map((p) => (
-                    <TableRow key={p.id} className="animate-fade-in group">
-                      <TableCell className="font-medium uppercase">{p.for_month}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          <User className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-sm">{p.owner?.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-sm">{p.property?.title}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-semibold flex items-center gap-0.5">
-                          <IndianRupee className="h-3.5 w-3.5" />
-                          {p.amount.toLocaleString('en-IN')}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={p.status === 'paid' ? 'default' : 'outline'} className={cn(
-                          p.status === 'paid' ? 'bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/20 border-none' : 'text-amber-500 border-amber-500/20'
-                        )}>
-                          {p.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {p.status === 'pending' ? (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="h-8 text-xs bg-emerald-500/5 hover:bg-emerald-500/10 border-emerald-500/20 text-emerald-600"
-                            onClick={() => handleMarkPayoutPaid(p.id)}
-                          >
-                            Mark Paid
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-muted-foreground italic">
-                            Paid on {p.payment_date ? format(new Date(p.payment_date), 'dd MMM') : 'N/A'}
-                          </span>
-                        )}
-                      </TableCell>
+            <div className="space-y-4">
+              <Card className="border-border/50 overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>For Month</TableHead>
+                      <TableHead>Owner</TableHead>
+                      <TableHead>Property</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {payouts.map((p) => (
+                      <TableRow key={p.id} className="animate-fade-in group">
+                        <TableCell className="font-medium uppercase">{p.for_month}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <User className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="text-sm">{p.owner?.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="text-sm">{p.property?.title}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-semibold flex items-center gap-0.5">
+                            <IndianRupee className="h-3.5 w-3.5" />
+                            {p.amount.toLocaleString('en-IN')}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={p.status === 'paid' ? 'default' : 'outline'} className={cn(
+                            p.status === 'paid' ? 'bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/20 border-none' : 'text-amber-500 border-amber-500/20'
+                          )}>
+                            {p.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {p.status === 'pending' ? (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="h-8 text-xs bg-emerald-500/5 hover:bg-emerald-500/10 border-emerald-500/20 text-emerald-600"
+                              onClick={() => handleMarkPayoutPaid(p.id)}
+                            >
+                              Mark Paid
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">
+                              Paid on {p.payment_date ? format(new Date(p.payment_date), 'dd MMM') : 'N/A'}
+                            </span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+
+              <InfiniteScroll
+                hasMore={payoutsHasMore}
+                isLoading={payoutsLoading}
+                onLoadMore={loadMorePayouts}
+                loadingText="Loading more payouts..."
+                endText="All payouts loaded"
+              />
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="schedules" className="space-y-6 outline-none">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="border-border/50 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-500 to-orange-600 opacity-[0.06]" />
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600">
+                    <Clock className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Pending Schedules</p>
+                    <p className="text-2xl font-bold">{schedules.filter(s => s.status === 'pending').length}</p>
+                  </div>
+                </div>
+              </CardContent>
             </Card>
+
+            <Card className="border-border/50 relative overflow-hidden ring-1 ring-red-500/20">
+              <div className="absolute inset-0 bg-gradient-to-br from-red-500 to-rose-600 opacity-[0.06]" />
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-xl bg-gradient-to-br from-red-500 to-rose-600">
+                    <Clock className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Overdue Schedules</p>
+                    <p className="text-2xl font-bold text-red-600">{schedules.filter(s => s.status === 'overdue').length}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/50 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 to-teal-600 opacity-[0.06]" />
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600">
+                    <CheckCircle2 className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Paid Schedules</p>
+                    <p className="text-2xl font-bold text-emerald-600">{schedules.filter(s => s.status === 'paid').length}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {schedules.length === 0 ? (
+            <Card className="border-border/50 border-dashed">
+              <CardContent className="py-20 text-center">
+                <Clock className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
+                <h3 className="font-semibold text-lg">No rent schedules found</h3>
+                <p className="text-muted-foreground text-sm mt-1">Schedules are generated automatically when active leases are created.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              <Card className="border-border/50 overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>For Month</TableHead>
+                      <TableHead>Tenant</TableHead>
+                      <TableHead>Property</TableHead>
+                      <TableHead>Expected Amount</TableHead>
+                      <TableHead>Due Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {schedules.map((s) => {
+                      const tenantName = s.tenant?.name || 'Tenant';
+                      const phone = s.tenant?.phone ? s.tenant.phone.replace(/[^0-9]/g, '') : '';
+                      const propertyTitle = s.property?.title || 'your property';
+                      const amount = s.expected_amount;
+                      const month = s.month_year;
+                      
+                      const message = `Hi ${tenantName}, this is a friendly reminder from RentMyWay that the rent of ₹${amount.toLocaleString('en-IN')} for the month of ${month} at ${propertyTitle} is overdue. Please make the payment at your earliest convenience. Thank you!`;
+                      const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+
+                      return (
+                        <TableRow key={s.id} className="animate-fade-in group">
+                          <TableCell className="font-medium uppercase">{month}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                              <User className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span className="text-sm">{tenantName}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                              <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span className="text-sm">{propertyTitle}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-semibold flex items-center gap-0.5">
+                              <IndianRupee className="h-3.5 w-3.5" />
+                              {amount.toLocaleString('en-IN')}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {format(new Date(s.due_date), 'dd MMM yyyy')}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={s.status === 'paid' ? 'default' : 'outline'} className={cn(
+                              s.status === 'paid' ? 'bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/20 border-none' :
+                              s.status === 'overdue' ? 'bg-rose-500/15 text-rose-500 hover:bg-rose-500/20 border-none' :
+                              'text-amber-500 border-amber-500/20'
+                            )}>
+                              {s.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {s.status !== 'paid' && (
+                              <div className="flex items-center justify-end gap-2">
+                                <a href={waUrl} target="_blank" rel="noopener noreferrer">
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="h-8 text-xs border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-600 gap-1.5"
+                                  >
+                                    <Phone className="h-3.5 w-3.5" />
+                                    Remind
+                                  </Button>
+                                </a>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-8 text-xs"
+                                  onClick={() => {
+                                    setSelectedTenant(s.tenant_id);
+                                    setPaymentMode('upi');
+                                    setDialogOpen(true);
+                                  }}
+                                >
+                                  Collect
+                                </Button>
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </Card>
+            </div>
           )}
         </TabsContent>
       </Tabs>

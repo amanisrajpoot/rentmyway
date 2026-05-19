@@ -130,6 +130,58 @@ export class PDFGenerator {
     doc.save(`Receipt_${data.receiptNo}.pdf`);
   }
 
+  static generateLeasePDF(lease: any) {
+    const doc = new jsPDF();
+    this.addHeader(doc, 'Lease Agreement');
+
+    doc.setTextColor(50);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('RESIDENTIAL LEASE AGREEMENT', 105, 55, { align: 'center' });
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    
+    // Main Body Agreement clauses
+    const clauses = [
+      `This Residential Lease Agreement is entered into on ${format(new Date(lease.start_date), 'dd MMM yyyy')} by and between the Landlord / Broker, and the Tenant: ${lease.tenant?.name || 'Tenant'}.`,
+      `1. LEASED PREMISES: The Landlord agrees to lease to the Tenant the property located at: ${lease.property?.title || 'Property Address'}, Locality: ${lease.property?.locality || 'N/A'}, City: ${lease.property?.city || 'N/A'}.`,
+      `2. LEASE TERM: The lease shall commence on ${format(new Date(lease.start_date), 'dd MMM yyyy')} and expire on ${format(new Date(lease.end_date), 'dd MMM yyyy')} (unless terminated earlier in accordance with this agreement).`,
+      `3. RENT PAYMENT: The monthly rent payable by the Tenant is INR ${lease.monthly_rent.toLocaleString('en-IN')}/month. Rent must be paid in full on or before the due date each month.`,
+      `4. SECURITY DEPOSIT: The Tenant has deposited a security amount of INR ${lease.security_deposit.toLocaleString('en-IN')} as a security deposit. This deposit will be returned within 30 days of move-out, minus any deductions for damages or unpaid utilities.`,
+      `5. LOCK-IN PERIOD & NOTICE: A mandatory lock-in period of ${lease.lock_in_months || 0} months applies from the commencement date. Following the lock-in period, either party may terminate this agreement by giving a written notice of ${lease.notice_period_days || 30} days.`,
+      `6. UTILITIES & MAINTENANCE: The Tenant shall pay all utility bills (electricity, water, internet) promptly. Common area society maintenance charges are ₹${(lease.maintenance_charge || 0).toLocaleString('en-IN')}/mo.`,
+      `7. COMPLIANCE & REPAIRS: The Tenant agrees to keep the premises in a good, clean condition and comply with all residential housing society regulations. Any structural repairs remain the responsibility of the Landlord.`
+    ];
+
+    let currentY = 70;
+    for (const clause of clauses) {
+      const splitClause = doc.splitTextToSize(clause, 170);
+      doc.text(splitClause, 20, currentY);
+      currentY += (splitClause.length * 5) + 8;
+      
+      // Page break check
+      if (currentY > 260) {
+        doc.addPage();
+        this.addHeader(doc, 'Lease Agreement');
+        currentY = 55;
+      }
+    }
+
+    // Signatures
+    currentY = Math.min(currentY + 20, 240);
+    doc.setDrawColor(200);
+    doc.line(20, currentY, 70, currentY);
+    doc.line(140, currentY, 190, currentY);
+    
+    doc.setFontSize(10);
+    doc.text('Tenant\'s Signature', 45, currentY + 5, { align: 'center' });
+    doc.text('Broker / Owner Signature', 165, currentY + 5, { align: 'center' });
+
+    this.addFooter(doc);
+    doc.save(`Lease_Agreement_${lease.id.slice(0, 8)}.pdf`);
+  }
+
   static generateCommissionInvoice(data: InvoiceData) {
     const doc = new jsPDF();
     this.addHeader(doc, 'Commission Invoice');

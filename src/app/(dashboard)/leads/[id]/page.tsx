@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { AddFollowUpDialog } from '@/components/leads/add-follow-up';
 import { MediaDisplay } from '@/components/ui/media-display';
+import { PhoneLink } from '@/components/ui/phone-link';
 
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -80,8 +81,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center gap-3">
-                <Phone className="h-4 w-4 text-muted-foreground" />
-                <span>{lead.phone}</span>
+                <PhoneLink phone={lead.phone} />
               </div>
               {lead.email && (
                 <div className="flex items-center gap-3">

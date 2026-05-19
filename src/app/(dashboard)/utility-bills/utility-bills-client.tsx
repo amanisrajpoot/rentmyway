@@ -21,7 +21,7 @@ import {
   Zap, Droplets, Flame, Wifi, Wrench, Building2, Plus, Loader2,
   IndianRupee,
 } from 'lucide-react';
-import { createUtilityBill, updateUtilityBill } from '@/lib/actions/utility-bills';
+import { createUtilityBill, updateUtilityBill, getUtilityBills } from '@/lib/actions/utility-bills';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 
@@ -46,10 +46,37 @@ type BillWithJoins = UtilityBill & {
   tenant?: { id: string; name: string } | null;
 };
 
-export function UtilityBillsClient({ initialBills }: { initialBills: BillWithJoins[] }) {
+import { InfiniteScroll } from '@/components/ui/infinite-scroll';
+import { Search } from 'lucide-react';
+
+export function UtilityBillsClient({ 
+  initialBills,
+  stats,
+  initialFilters
+}: { 
+  initialBills: BillWithJoins[];
+  stats: {
+    totalAmount: number;
+    pendingAmount: number;
+  };
+  initialFilters: {
+    search: string;
+    billType: string;
+    status: string;
+  };
+}) {
   const router = useRouter();
-  const [typeFilter, setTypeFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  
+  const [search, setSearch] = useState(initialFilters.search);
+  const [typeFilter, setTypeFilter] = useState(initialFilters.billType);
+  const [statusFilter, setStatusFilter] = useState(initialFilters.status);
+
+  // Paginated state
+  const [bills, setBills] = useState<BillWithJoins[]>(initialBills);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(initialBills.length >= 12);
+  const [loading, setLoading] = useState(false);
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [properties, setProperties] = useState<{ id: string; title: string }[]>([]);
@@ -70,14 +97,57 @@ export function UtilityBillsClient({ initialBills }: { initialBills: BillWithJoi
     load();
   }, []);
 
-  const filtered = initialBills.filter((b) => {
-    const matchType = typeFilter === 'all' || b.bill_type === typeFilter;
-    const matchStatus = statusFilter === 'all' || b.status === statusFilter;
-    return matchType && matchStatus;
-  });
+  // Sync state if server props change
+  useEffect(() => {
+    setBills(initialBills);
+    setPage(0);
+    setHasMore(initialBills.length >= 12);
+  }, [initialBills]);
 
-  const totalAmount = initialBills.reduce((sum, b) => sum + b.amount, 0);
-  const pendingAmount = initialBills.filter(b => b.status !== 'paid').reduce((sum, b) => sum + b.amount, 0);
+  // Debounced URL updates
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      
+      if (search) params.set('search', search);
+      else params.delete('search');
+
+      if (typeFilter !== 'all') params.set('type', typeFilter);
+      else params.delete('type');
+
+      if (statusFilter !== 'all') params.set('status', statusFilter);
+      else params.delete('status');
+
+      router.replace(`${window.location.pathname}?${params.toString()}`);
+    }, 400);
+
+    return () => clearTimeout(handler);
+  }, [search, typeFilter, statusFilter, router]);
+
+  const loadMore = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const nextPage = page + 1;
+      const nextBills = await getUtilityBills({
+        search,
+        billType: typeFilter,
+        status: statusFilter,
+        page: nextPage,
+        limit: 12,
+      });
+
+      if (nextBills.length < 12) {
+        setHasMore(false);
+      }
+      setBills((prev) => [...prev, ...(nextBills as BillWithJoins[])]);
+      setPage(nextPage);
+    } catch {
+      toast.error('Failed to load more bills');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -213,11 +283,11 @@ export function UtilityBillsClient({ initialBills }: { initialBills: BillWithJoi
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Total Bills</p>
-              <p className="text-2xl font-bold">₹{totalAmount.toLocaleString('en-IN')}</p>
+              <p className="text-2xl font-bold">₹{stats.totalAmount.toLocaleString('en-IN')}</p>
             </div>
           </CardContent>
         </Card>
-        <Card className={`border-border/50 relative overflow-hidden ${pendingAmount > 0 ? 'ring-1 ring-amber-500/20' : ''}`}>
+        <Card className={`border-border/50 relative overflow-hidden ${stats.pendingAmount > 0 ? 'ring-1 ring-amber-500/20' : ''}`}>
           <div className="absolute inset-0 bg-gradient-to-br from-[oklch(0.60_0.2_25)] to-[oklch(0.55_0.19_10)] opacity-[0.06]" />
           <CardContent className="pt-5 flex items-center gap-4">
             <div className="p-2.5 rounded-xl bg-gradient-to-br from-[oklch(0.60_0.2_25)] to-[oklch(0.55_0.19_10)]">
@@ -225,14 +295,23 @@ export function UtilityBillsClient({ initialBills }: { initialBills: BillWithJoi
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Pending</p>
-              <p className="text-2xl font-bold">₹{pendingAmount.toLocaleString('en-IN')}</p>
+              <p className="text-2xl font-bold">₹{stats.pendingAmount.toLocaleString('en-IN')}</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-3">
+      {/* Global Toolbar with Search & Dropdowns */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search bills by property, tenant, or month..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 bg-card"
+          />
+        </div>
         <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v ?? 'all')}>
           <SelectTrigger className="w-[150px] bg-card">
             <SelectValue placeholder="All Types" />
@@ -258,7 +337,7 @@ export function UtilityBillsClient({ initialBills }: { initialBills: BillWithJoi
       </div>
 
       {/* Table */}
-      {filtered.length === 0 ? (
+      {bills.length === 0 ? (
         <Card className="border-border/50 border-dashed">
           <CardContent className="py-16 text-center">
             <Zap className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
@@ -269,64 +348,74 @@ export function UtilityBillsClient({ initialBills }: { initialBills: BillWithJoi
           </CardContent>
         </Card>
       ) : (
-        <Card className="border-border/50 overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Type</TableHead>
-                <TableHead>Property</TableHead>
-                <TableHead>Month</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-24">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((bill) => {
-                const BillIcon = billIcons[bill.bill_type] || Zap;
-                return (
-                  <TableRow key={bill.id} className="animate-fade-in">
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <BillIcon className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{BILL_TYPE_LABELS[bill.bill_type]}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {bill.property && (
-                        <span className="text-sm">{bill.property.title}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm">{bill.bill_month}</TableCell>
-                    <TableCell>
-                      <span className="font-semibold flex items-center gap-0.5">
-                        <IndianRupee className="h-3.5 w-3.5" />
-                        {bill.amount.toLocaleString('en-IN')}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={statusColors[bill.status]}>
-                        {bill.status.charAt(0).toUpperCase() + bill.status.slice(1)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {bill.status !== 'paid' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-xs"
-                          onClick={() => handleMarkPaid(bill.id)}
-                        >
-                          Mark Paid
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </Card>
+        <div className="space-y-4">
+          <Card className="border-border/50 overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Property</TableHead>
+                  <TableHead>Month</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-24">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {bills.map((bill) => {
+                  const BillIcon = billIcons[bill.bill_type] || Zap;
+                  return (
+                    <TableRow key={bill.id} className="animate-fade-in">
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <BillIcon className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">{BILL_TYPE_LABELS[bill.bill_type]}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {bill.property && (
+                          <span className="text-sm">{bill.property.title}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm">{bill.bill_month}</TableCell>
+                      <TableCell>
+                        <span className="font-semibold flex items-center gap-0.5">
+                          <IndianRupee className="h-3.5 w-3.5" />
+                          {bill.amount.toLocaleString('en-IN')}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={statusColors[bill.status]}>
+                          {bill.status.charAt(0).toUpperCase() + bill.status.slice(1)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {bill.status !== 'paid' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => handleMarkPaid(bill.id)}
+                          >
+                            Mark Paid
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </Card>
+
+          <InfiniteScroll
+            hasMore={hasMore}
+            isLoading={loading}
+            onLoadMore={loadMore}
+            loadingText="Loading more bills..."
+            endText="All bills loaded"
+          />
+        </div>
       )}
     </div>
   );

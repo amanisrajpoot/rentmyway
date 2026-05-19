@@ -5,7 +5,12 @@ import { getUserProfile } from '@/lib/actions/auth';
 import { revalidatePath } from 'next/cache';
 import type { ComplaintInsert, ComplaintStatus } from '@/types/database';
 
-export async function getComplaints(filters?: { status?: string }) {
+export async function getComplaints(filters?: {
+  status?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}) {
   const supabase = await createClient();
   const profile = await getUserProfile();
   if (!profile) return [];
@@ -19,7 +24,6 @@ export async function getComplaints(filters?: { status?: string }) {
   if (profile.role === 'broker') {
     query = query.eq('broker_id', profile.id);
   } else if (profile.role === 'tenant') {
-    // Try profile_id first, then fall back to email-based lookup
     let tenantId: string | null = null;
     const { data: byProfileId } = await supabase
       .from('tenants')
@@ -41,10 +45,9 @@ export async function getComplaints(filters?: { status?: string }) {
     if (tenantId) {
       query = query.eq('tenant_id', tenantId);
     } else {
-      return []; // No tenant record found
+      return [];
     }
   } else if (profile.role === 'owner') {
-    // Owner: find all properties they own, then get complaints for those properties
     const { data: owners } = await supabase
       .from('owners')
       .select('id')
@@ -65,6 +68,32 @@ export async function getComplaints(filters?: { status?: string }) {
   if (filters?.status && filters.status !== 'all') {
     query = query.eq('status', filters.status);
   }
+
+  if (filters?.search) {
+    const searchVal = `%${filters.search}%`;
+    const [matchingProperties, matchingTenants] = await Promise.all([
+      supabase.from('properties').select('id').ilike('title', searchVal),
+      supabase.from('tenants').select('id').ilike('name', searchVal),
+    ]);
+    const propertyIds = matchingProperties.data?.map(p => p.id) || [];
+    const tenantIds = matchingTenants.data?.map(t => t.id) || [];
+
+    let orParts = [`title.ilike.${searchVal}`, `description.ilike.${searchVal}`];
+    if (propertyIds.length > 0) {
+      orParts.push(`property_id.in.(${propertyIds.join(',')})`);
+    }
+    if (tenantIds.length > 0) {
+      orParts.push(`tenant_id.in.(${tenantIds.join(',')})`);
+    }
+    query = query.or(orParts.join(','));
+  }
+
+  // Pagination
+  const page = filters?.page ?? 0;
+  const limit = filters?.limit ?? 12;
+  const from = page * limit;
+  const to = from + limit - 1;
+  query = query.range(from, to);
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);

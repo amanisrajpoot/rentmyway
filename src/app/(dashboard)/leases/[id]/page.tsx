@@ -1,5 +1,7 @@
 import { getLease } from '@/lib/actions/leases';
 import { getRentSchedule } from '@/lib/actions/rent-schedule';
+import { getUserProfile } from '@/lib/actions/auth';
+import { LeaseActionsWorkspace } from '@/components/leases/lease-actions-workspace';
 import { notFound } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -37,9 +39,13 @@ export default async function LeaseDetailPage({ params }: { params: Promise<{ id
   const { id } = await params;
   let lease;
   let schedule;
+  let profile;
   try {
     lease = await getLease(id);
-    schedule = await getRentSchedule({ tenantId: lease.tenant_id });
+    [schedule, profile] = await Promise.all([
+      getRentSchedule({ tenantId: lease.tenant_id }),
+      getUserProfile(),
+    ]);
   } catch {
     notFound();
   }
@@ -318,28 +324,8 @@ export default async function LeaseDetailPage({ params }: { params: Promise<{ id
             </CardContent>
           </Card>
 
-          {/* Agreement Document */}
-          {lease.agreement_url && (
-            <Card className="border-border/50">
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-primary" />
-                  Agreement
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <a
-                  href={lease.agreement_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-sm text-primary hover:underline"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  View Agreement Document
-                </a>
-              </CardContent>
-            </Card>
-          )}
+          {/* Agreement Workspace */}
+          <LeaseActionsWorkspace lease={lease} userRole={profile?.role || 'tenant'} />
         </div>
       </div>
     </div>

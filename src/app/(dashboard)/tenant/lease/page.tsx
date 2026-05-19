@@ -11,6 +11,7 @@ import {
   Shield, Building2, AlertTriangle, CheckCircle, CalendarClock,
 } from 'lucide-react';
 import { LEASE_STATUS_LABELS, PAYMENT_STATUS_LABELS } from '@/types/database';
+import { LeaseDownloadButton } from '@/components/tenant/lease-button';
 
 const statusColors: Record<string, string> = {
   draft: 'bg-muted text-muted-foreground',
@@ -164,9 +165,12 @@ export default async function TenantLeasePage() {
                   <ScrollText className="h-5 w-5 text-primary" />
                   Lease Agreement
                 </CardTitle>
-                <Badge className={statusColors[lease.status as string]}>
-                  {LEASE_STATUS_LABELS[lease.status as keyof typeof LEASE_STATUS_LABELS]}
-                </Badge>
+                <div className="flex items-center gap-3">
+                  <Badge className={statusColors[lease.status as string]}>
+                    {LEASE_STATUS_LABELS[lease.status as keyof typeof LEASE_STATUS_LABELS]}
+                  </Badge>
+                  <LeaseDownloadButton lease={lease} />
+                </div>
               </div>
             </CardHeader>
             <CardContent className="pt-4">

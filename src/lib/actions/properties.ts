@@ -10,6 +10,10 @@ export async function getProperties(filters?: {
   status?: string;
   type?: string;
   search?: string;
+  minRent?: number;
+  maxRent?: number;
+  page?: number;
+  limit?: number;
 }) {
   const supabase = await createClient();
   const profile = await getUserProfile();
@@ -68,6 +72,19 @@ export async function getProperties(filters?: {
       `title.ilike.%${filters.search}%,locality.ilike.%${filters.search}%,address.ilike.%${filters.search}%`
     );
   }
+  if (filters?.minRent !== undefined) {
+    query = query.gte('rent', filters.minRent);
+  }
+  if (filters?.maxRent !== undefined) {
+    query = query.lte('rent', filters.maxRent);
+  }
+
+  // Pagination range
+  const limit = filters?.limit ?? 25;
+  const page = filters?.page ?? 0;
+  const from = page * limit;
+  const to = from + limit - 1;
+  query = query.range(from, to);
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);

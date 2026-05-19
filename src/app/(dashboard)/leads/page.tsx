@@ -1,8 +1,36 @@
-import { getLeads } from '@/lib/actions/leads';
+import { getLeads, getBrokerSiteVisits } from '@/lib/actions/leads';
 import { LeadsClient } from './leads-client';
 
-export default async function LeadsPage() {
-  const leads = await getLeads();
+export default async function LeadsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    search?: string;
+    status?: string;
+  }>;
+}) {
+  const resolvedParams = await searchParams;
+  const search = resolvedParams.search ?? '';
+  const status = resolvedParams.status ?? 'all';
 
-  return <LeadsClient initialLeads={leads} />;
+  const [leads, siteVisits] = await Promise.all([
+    getLeads({
+      search,
+      status,
+      page: 0,
+      limit: 12,
+    }),
+    getBrokerSiteVisits()
+  ]);
+
+  return (
+    <LeadsClient
+      initialLeads={leads}
+      initialSiteVisits={siteVisits as any[]}
+      initialFilters={{
+        search,
+        status,
+      }}
+    />
+  );
 }

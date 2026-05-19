@@ -8,20 +8,21 @@ import {
 } from '@/components/ui/table';
 import { format } from 'date-fns';
 import { IndianRupee, Banknote, Building2 } from 'lucide-react';
+import { ReceiptDownloadButton } from '@/components/tenant/receipt-button';
 
 const modeLabels: Record<string, string> = {
   cash: 'Cash',
   upi: 'UPI',
   bank_transfer: 'Bank Transfer',
-  cheque: 'Cheque',
+  credit_card: 'Credit Card',
   other: 'Other',
 };
 
 const modeColors: Record<string, string> = {
-  cash: 'bg-emerald-500/15 text-emerald-400',
-  upi: 'bg-purple-500/15 text-purple-400',
-  bank_transfer: 'bg-blue-500/15 text-blue-400',
-  cheque: 'bg-amber-500/15 text-amber-400',
+  cash: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  upi: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  bank_transfer: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  credit_card: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
   other: 'bg-muted text-muted-foreground',
 };
 
@@ -34,8 +35,9 @@ export default async function TenantPaymentsPage() {
   // Find active tenant record by email
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('id')
+    .select('id, name')
     .eq('email', profile.email)
+    .eq('is_active', true)
     .single();
 
   if (!tenant) {
@@ -44,9 +46,9 @@ export default async function TenantPaymentsPage() {
         <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center">
           <Banknote className="h-8 w-8 text-muted-foreground" />
         </div>
-        <h2 className="text-xl font-semibold">No Rent Profile Found</h2>
+        <h2 className="text-xl font-semibold">No Tenant Record Found</h2>
         <p className="text-muted-foreground max-w-md">
-          We couldn't find your tenant record.
+          We couldn't find an active tenant record for your account.
         </p>
       </div>
     );
@@ -54,7 +56,7 @@ export default async function TenantPaymentsPage() {
 
   const { data: payments } = await supabase
     .from('rent_payments')
-    .select('*, property:properties(title)')
+    .select('*, property:properties(title, address, locality, city)')
     .eq('tenant_id', tenant.id)
     .order('payment_date', { ascending: false });
 
@@ -70,35 +72,33 @@ export default async function TenantPaymentsPage() {
         </p>
       </div>
 
-      <Card className="border-border/50 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-[oklch(0.65_0.15_80)] to-[oklch(0.60_0.14_60)] opacity-[0.06]" />
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-[oklch(0.65_0.15_80)] to-[oklch(0.60_0.14_60)]">
-              <Banknote className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Paid</p>
-              <p className="text-2xl font-bold flex items-center gap-0.5">
-                <IndianRupee className="h-5 w-5" />
-                {totalPaid.toLocaleString('en-IN')}
-              </p>
-            </div>
-            <div className="ml-auto text-right">
-              <p className="text-sm text-muted-foreground">Transactions</p>
-              <p className="text-2xl font-bold">{pastPayments.length}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <Card className="border-border/50 bg-gradient-to-br from-background to-muted/20">
+          <CardContent className="p-6">
+            <p className="text-sm font-medium text-muted-foreground">Total Paid</p>
+            <p className="text-3xl font-bold mt-2 text-emerald-500 flex items-center">
+              <IndianRupee className="h-7 w-7" />
+              {totalPaid.toLocaleString('en-IN')}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50 bg-gradient-to-br from-background to-muted/20">
+          <CardContent className="p-6">
+            <p className="text-sm font-medium text-muted-foreground">Transactions</p>
+            <p className="text-3xl font-bold mt-2">{pastPayments.length}</p>
+          </CardContent>
+        </Card>
+      </div>
 
       {pastPayments.length === 0 ? (
-        <Card className="border-border/50">
-          <CardContent className="py-16 text-center">
-            <IndianRupee className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
-            <h3 className="font-semibold text-lg">No payments yet</h3>
-            <p className="text-muted-foreground text-sm mt-1">
-              Your rent payment history will appear here once recorded by your broker.
+        <Card className="border-border/50 border-dashed">
+          <CardContent className="py-16 sm:py-20 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+              <Banknote className="h-8 w-8 text-muted-foreground/30" />
+            </div>
+            <h3 className="font-semibold text-lg">No payments recorded</h3>
+            <p className="text-muted-foreground text-sm mt-1.5 max-w-sm mx-auto">
+              You haven't made any rent payments yet or they haven't been recorded by your broker.
             </p>
           </CardContent>
         </Card>
@@ -112,6 +112,7 @@ export default async function TenantPaymentsPage() {
                 <TableHead>Amount</TableHead>
                 <TableHead>Mode</TableHead>
                 <TableHead>Date</TableHead>
+                <TableHead className="w-[100px] text-right">Receipt</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -141,6 +142,9 @@ export default async function TenantPaymentsPage() {
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {format(new Date(payment.payment_date), 'dd MMM yyyy')}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <ReceiptDownloadButton payment={payment as any} tenantName={tenant.name} />
                   </TableCell>
                 </TableRow>
               ))}

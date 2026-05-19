@@ -9,6 +9,9 @@ export async function getOwnerPayouts(filters?: {
   ownerId?: string;
   propertyId?: string;
   status?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
 }) {
   const supabase = await createClient();
   const profile = await getUserProfile();
@@ -40,6 +43,34 @@ export async function getOwnerPayouts(filters?: {
   if (filters?.status && filters.status !== 'all') {
     query = query.eq('status', filters.status);
   }
+
+  if (filters?.search) {
+    // Light search by owner name or property title
+    const searchVal = `%${filters.search}%`;
+    const [matchingOwners, matchingProperties] = await Promise.all([
+      supabase.from('owners').select('id').ilike('name', searchVal),
+      supabase.from('properties').select('id').ilike('title', searchVal),
+    ]);
+    const ownerIds = matchingOwners.data?.map(o => o.id) || [];
+    const propertyIds = matchingProperties.data?.map(p => p.id) || [];
+
+    if (ownerIds.length > 0 && propertyIds.length > 0) {
+      query = query.or(`owner_id.in.(${ownerIds.join(',')}),property_id.in.(${propertyIds.join(',')})`);
+    } else if (ownerIds.length > 0) {
+      query = query.in('owner_id', ownerIds);
+    } else if (propertyIds.length > 0) {
+      query = query.in('property_id', propertyIds);
+    } else {
+      return []; // empty search match
+    }
+  }
+
+  // Pagination
+  const page = filters?.page ?? 0;
+  const limit = filters?.limit ?? 12;
+  const from = page * limit;
+  const to = from + limit - 1;
+  query = query.range(from, to);
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);

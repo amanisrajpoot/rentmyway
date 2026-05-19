@@ -197,3 +197,110 @@ export async function getRentSummary() {
     collectionRate: items.length > 0 ? Math.round((paid / items.length) * 100) : 0,
   };
 }
+
+import { createNotification } from '@/lib/actions/notifications';
+
+export async function runRentAutomation() {
+  const supabase = await createClient();
+  const profile = await getUserProfile();
+  if (!profile) throw new Error('Not authenticated');
+
+  const today = new Date().toISOString().split('T')[0];
+
+  // 1. Fetch all pending or overdue schedules whose due date has passed
+  const { data: overdueSchedules, error: fetchErr } = await supabase
+    .from('rent_schedule')
+    .select('*, tenant:tenants(id, name, profile_id, phone), property:properties(id, title)')
+    .eq('broker_id', profile.id)
+    .in('status', ['pending', 'overdue'])
+    .lt('due_date', today);
+
+  if (fetchErr) throw new Error(fetchErr.message);
+
+  let updatedCount = 0;
+
+  for (const schedule of (overdueSchedules || [])) {
+    // If status is pending, transition it to overdue
+    if (schedule.status === 'pending') {
+      const { error: updateErr } = await supabase
+        .from('rent_schedule')
+        .update({ status: 'overdue' })
+        .eq('id', schedule.id);
+
+      if (updateErr) continue;
+      updatedCount++;
+    }
+
+    // Send notifications to tenant (if profile_id exists) and broker
+    const tenantName = schedule.tenant?.name || 'Tenant';
+    const propertyTitle = schedule.property?.title || 'your unit';
+    const month = schedule.month_year;
+    const amount = schedule.expected_amount;
+
+    if (schedule.tenant?.profile_id) {
+      await createNotification({
+        user_id: schedule.tenant.profile_id,
+        type: 'rent_overdue',
+        title: 'Rent Overdue Alert',
+        message: `Your rent of ₹${amount.toLocaleString('en-IN')} for ${month} at ${propertyTitle} is overdue. Please pay immediately.`,
+        link: '/tenant/dashboard',
+        metadata: { schedule_id: schedule.id }
+      });
+    }
+
+    // Notify the broker too
+    await createNotification({
+      user_id: profile.id,
+      type: 'rent_overdue',
+      title: `Overdue Rent: ${tenantName}`,
+      message: `Rent of ₹${amount.toLocaleString('en-IN')} for ${month} at ${propertyTitle} by ${tenantName} is overdue.`,
+      link: '/payments',
+      metadata: { schedule_id: schedule.id }
+    });
+  }
+
+  // 2. Fetch all upcoming schedules (due within next 5 days) and notify the tenant
+  const future = new Date();
+  future.setDate(future.getDate() + 5);
+  const futureStr = future.toISOString().split('T')[0];
+
+  const { data: upcomingSchedules } = await supabase
+    .from('rent_schedule')
+    .select('*, tenant:tenants(id, name, profile_id), property:properties(id, title)')
+    .eq('broker_id', profile.id)
+    .eq('status', 'pending')
+    .gte('due_date', today)
+    .lte('due_date', futureStr);
+
+  for (const schedule of (upcomingSchedules || [])) {
+    if (schedule.tenant?.profile_id) {
+      const propertyTitle = schedule.property?.title || 'your unit';
+      const month = schedule.month_year;
+      const amount = schedule.expected_amount;
+
+      // Check if they already have an upcoming notification for this month to avoid duplicates
+      const { data: existing } = await supabase
+        .from('notifications')
+        .select('id')
+        .eq('user_id', schedule.tenant.profile_id)
+        .eq('type', 'rent_due')
+        .contains('metadata', { schedule_id: schedule.id })
+        .limit(1);
+
+      if (!existing || existing.length === 0) {
+        await createNotification({
+          user_id: schedule.tenant.profile_id,
+          type: 'rent_due',
+          title: 'Upcoming Rent Reminder',
+          message: `Your rent of ₹${amount.toLocaleString('en-IN')} for ${month} at ${propertyTitle} is due on ${schedule.due_date}.`,
+          link: '/tenant/dashboard',
+          metadata: { schedule_id: schedule.id }
+        });
+      }
+    }
+  }
+
+  revalidatePath('/payments');
+  return { updatedCount };
+}
+

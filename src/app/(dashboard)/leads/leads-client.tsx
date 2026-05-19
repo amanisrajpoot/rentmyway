@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import type { Lead, LeadStatus } from '@/types/database';
 import { LEAD_STAGE_ORDER, LEAD_STAGE_LABELS, LEAD_SOURCE_LABELS } from '@/types/database';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,12 +13,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
-import { updateLeadStage, convertLead } from '@/lib/actions/leads';
+import { updateLeadStage, convertLead, getLeads } from '@/lib/actions/leads';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import {
   Plus, Phone, Eye, ChevronRight, ChevronLeft, IndianRupee, MapPin, Loader2,
+  Kanban, List, Search, Download,
 } from 'lucide-react';
+import { PhoneLink } from '@/components/ui/phone-link';
+import { Input } from '@/components/ui/input';
+import { InfiniteScroll } from '@/components/ui/infinite-scroll';
+import { exportToCSV } from '@/lib/utils/export';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 const stageColors: Record<LeadStatus, string> = {
   new: 'border-t-blue-500',
@@ -41,8 +48,36 @@ const stageBadgeColors: Record<LeadStatus, string> = {
   lost: 'bg-red-500/15 text-red-400',
 };
 
-export function LeadsClient({ initialLeads }: { initialLeads: Lead[] }) {
-  const [leads, setLeads] = useState(initialLeads);
+interface LeadsClientProps {
+  initialLeads: Lead[];
+  initialSiteVisits: any[];
+  initialFilters: {
+    search: string;
+    status: string;
+  };
+}
+
+import { cn } from '@/lib/utils';
+import { CalendarWorkspace } from '@/components/leads/calendar-workspace';
+import { Calendar as LucideCalendar } from 'lucide-react';
+
+export function LeadsClient({ initialLeads, initialSiteVisits, initialFilters }: LeadsClientProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'calendar'>('kanban');
+  const [search, setSearch] = useState(initialFilters.search);
+  const [statusFilter, setStatusFilter] = useState(initialFilters.status);
+
+  const [leads, setLeads] = useState<Lead[]>(initialLeads);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(initialLeads.length >= 12);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const [draggedOverStage, setDraggedOverStage] = useState<string | null>(null);
+  const [isDraggingLeadId, setIsDraggingLeadId] = useState<string | null>(null);
+
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [convertingLeadId, setConvertingLeadId] = useState<string | null>(null);
   const [selectedPropertyId, setSelectedPropertyId] = useState('');
@@ -62,11 +97,51 @@ export function LeadsClient({ initialLeads }: { initialLeads: Lead[] }) {
     loadProperties();
   }, []);
 
-  // Group leads by stage
-  const grouped = LEAD_STAGE_ORDER.reduce((acc, stage) => {
-    acc[stage] = leads.filter((l) => l.status === stage);
-    return acc;
-  }, {} as Record<LeadStatus, Lead[]>);
+  useEffect(() => {
+    setLeads(initialLeads);
+    setPage(0);
+    setHasMore(initialLeads.length >= 12);
+  }, [initialLeads]);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      
+      if (search) params.set('search', search);
+      else params.delete('search');
+
+      if (statusFilter !== 'all') params.set('status', statusFilter);
+      else params.delete('status');
+
+      router.replace(`${pathname}?${params.toString()}`);
+    }, 400);
+
+    return () => clearTimeout(handler);
+  }, [search, statusFilter, router, pathname, searchParams]);
+
+  const loadMore = async () => {
+    if (isLoading) return;
+    setIsLoading(true);
+    try {
+      const nextPage = page + 1;
+      const nextLeads = await getLeads({
+        search,
+        status: statusFilter,
+        page: nextPage,
+        limit: 12,
+      });
+
+      if (nextLeads.length < 12) {
+        setHasMore(false);
+      }
+      setLeads((prev) => [...prev, ...nextLeads]);
+      setPage(nextPage);
+    } catch {
+      toast.error('Failed to load more leads');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   async function moveLead(leadId: string, direction: 'forward' | 'backward') {
     const lead = leads.find((l) => l.id === leadId);
@@ -78,14 +153,12 @@ export function LeadsClient({ initialLeads }: { initialLeads: Lead[] }) {
 
     const newStatus = LEAD_STAGE_ORDER[newIdx];
 
-    // If moving to "converted", open the conversion dialog instead
     if (newStatus === 'converted') {
       setConvertingLeadId(leadId);
       setConvertDialogOpen(true);
       return;
     }
 
-    // Optimistic update
     setLeads((prev) =>
       prev.map((l) => (l.id === leadId ? { ...l, status: newStatus } : l))
     );
@@ -112,7 +185,7 @@ export function LeadsClient({ initialLeads }: { initialLeads: Lead[] }) {
       setLeads((prev) =>
         prev.map((l) => (l.id === convertingLeadId ? { ...l, status: 'converted' as LeadStatus } : l))
       );
-      toast.success('Lead converted to tenant successfully! KYC link generated.');
+      toast.success('Lead converted to tenant successfully!');
       setConvertDialogOpen(false);
       setConvertingLeadId(null);
       setSelectedPropertyId('');
@@ -123,114 +196,343 @@ export function LeadsClient({ initialLeads }: { initialLeads: Lead[] }) {
     }
   }
 
+  async function handleDrop(e: React.DragEvent, targetStatus: LeadStatus) {
+    setDraggedOverStage(null);
+    const leadId = e.dataTransfer.getData('text/plain');
+    if (!leadId) return;
+
+    const lead = leads.find((l) => l.id === leadId);
+    if (!lead || lead.status === targetStatus) return;
+
+    if (targetStatus === 'converted') {
+      setConvertingLeadId(leadId);
+      setConvertDialogOpen(true);
+      return;
+    }
+
+    const previousStatus = lead.status;
+    setLeads((prev) =>
+      prev.map((l) => (l.id === leadId ? { ...l, status: targetStatus } : l))
+    );
+
+    try {
+      await updateLeadStage(leadId, targetStatus);
+      toast.success(`Moved to ${LEAD_STAGE_LABELS[targetStatus]}`);
+    } catch {
+      setLeads((prev) =>
+        prev.map((l) => (l.id === leadId ? { ...l, status: previousStatus } : l))
+      );
+      toast.error('Failed to update lead stage');
+    }
+  }
+
+  const grouped = LEAD_STAGE_ORDER.reduce((acc, stage) => {
+    acc[stage] = leads.filter((l) => l.status === stage);
+    return acc;
+  }, {} as Record<LeadStatus, Lead[]>);
+
+  const handleExportCSV = () => {
+    const dataToExport = leads.map((l) => ({
+      Name: l.name,
+      Phone: l.phone,
+      Email: l.email || '',
+      Status: LEAD_STAGE_LABELS[l.status] || l.status,
+      Source: LEAD_SOURCE_LABELS[l.source as keyof typeof LEAD_SOURCE_LABELS] || l.source || '',
+      Locality: l.preferred_locality || '',
+      MinBudget: l.budget_min || 0,
+      MaxBudget: l.budget_max || 0,
+      PreferredType: l.preferred_type || '',
+      Notes: l.notes || '',
+    }));
+    exportToCSV(dataToExport, `Leads_Report_${new Date().toISOString().split('T')[0]}.csv`);
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Lead Pipeline</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            {leads.length} total leads
+            Manage and track active sales inquiries
           </p>
         </div>
-        <Link href="/leads/new">
-          <Button className="bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Lead
+        <div className="flex items-center gap-3 self-stretch sm:self-auto">
+          <div className="flex bg-muted p-1 rounded-lg shrink-0">
+            <Button
+              variant={viewMode === 'kanban' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-8 px-3"
+              onClick={() => setViewMode('kanban')}
+            >
+              <Kanban className="h-4 w-4 mr-1.5" />
+              Kanban
+            </Button>
+            <Button
+              variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-8 px-3"
+              onClick={() => setViewMode('list')}
+            >
+              <List className="h-4 w-4 mr-1.5" />
+              List
+            </Button>
+            <Button
+              variant={viewMode === 'calendar' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-8 px-3"
+              onClick={() => setViewMode('calendar')}
+            >
+              <LucideCalendar className="h-4 w-4 mr-1.5" />
+              Calendar
+            </Button>
+          </div>
+
+          <Button 
+            onClick={handleExportCSV}
+            variant="outline"
+            className="border-primary/20 hover:bg-primary/5 text-primary"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
           </Button>
-        </Link>
-      </div>
 
-      {/* Kanban Board */}
-      <div className="w-full overflow-x-auto pb-4 snap-x">
-        <div className="flex gap-4 min-w-max px-1">
-          {LEAD_STAGE_ORDER.map((stage) => (
-            <div key={stage} className="w-72 shrink-0">
-              <div className="flex items-center gap-2 mb-3">
-                <h3 className="text-sm font-semibold">{LEAD_STAGE_LABELS[stage]}</h3>
-                <Badge variant="secondary" className="text-xs px-1.5 h-5">
-                  {grouped[stage].length}
-                </Badge>
-              </div>
-
-              <div className="space-y-3">
-                {grouped[stage].length === 0 ? (
-                  <div className="border border-dashed border-border/50 rounded-lg p-6 text-center">
-                    <p className="text-xs text-muted-foreground">No leads</p>
-                  </div>
-                ) : (
-                  grouped[stage].map((lead) => (
-                    <Card
-                      key={lead.id}
-                      className={`border-border/50 border-t-2 ${stageColors[stage]} animate-slide-up`}
-                    >
-                      <CardContent className="pt-4 space-y-2.5">
-                        <div className="flex items-start justify-between">
-                          <div className="min-w-0">
-                            <p className="font-semibold text-sm truncate">{lead.name}</p>
-                            <p className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Phone className="h-3 w-3" /> {lead.phone}
-                            </p>
-                          </div>
-                          <Link href={`/leads/${lead.id}`}>
-                            <Button variant="ghost" size="icon" className="h-7 w-7">
-                              <Eye className="h-3.5 w-3.5" />
-                            </Button>
-                          </Link>
-                        </div>
-
-                        {(lead.budget_min || lead.budget_max) && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <IndianRupee className="h-3 w-3" />
-                            {lead.budget_min ? `₹${lead.budget_min.toLocaleString('en-IN')}` : '—'} - {lead.budget_max ? `₹${lead.budget_max.toLocaleString('en-IN')}` : '—'}
-                          </p>
-                        )}
-
-                        {lead.preferred_locality && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <MapPin className="h-3 w-3" /> {lead.preferred_locality}
-                          </p>
-                        )}
-
-                        {lead.source && (
-                          <Badge className={`${stageBadgeColors[stage]} text-xs`}>
-                            {LEAD_SOURCE_LABELS[lead.source]}
-                          </Badge>
-                        )}
-
-                        {/* Move buttons */}
-                        {stage !== 'converted' && stage !== 'lost' && (
-                          <div className="flex justify-between pt-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 text-xs"
-                              disabled={stage === LEAD_STAGE_ORDER[0]}
-                              onClick={() => moveLead(lead.id, 'backward')}
-                            >
-                              <ChevronLeft className="h-3 w-3 mr-1" /> Back
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 text-xs text-primary"
-                              onClick={() => moveLead(lead.id, 'forward')}
-                            >
-                              Next <ChevronRight className="h-3 w-3 ml-1" />
-                            </Button>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
-            </div>
-          ))}
+          <Link href="/leads/new" className="flex-1 sm:flex-initial">
+            <Button className="w-full bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white shadow-lg shadow-primary/20">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Lead
+            </Button>
+          </Link>
         </div>
       </div>
 
-      {/* Conversion Dialog */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1 sm:max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Search leads by name or phone..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 bg-card"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? 'all')}>
+          <SelectTrigger className="w-[160px] bg-card">
+            <SelectValue placeholder="All Stages" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Stages</SelectItem>
+            {Object.entries(LEAD_STAGE_LABELS).map(([k, v]) => (
+              <SelectItem key={k} value={k}>{v}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {leads.length === 0 ? (
+        <Card className="border-border/50 border-dashed">
+          <CardContent className="py-16 text-center">
+            <Search className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
+            <h3 className="font-semibold text-lg">No leads found</h3>
+            <p className="text-muted-foreground text-sm mt-1">
+              Try adjusting your search query or filters.
+            </p>
+          </CardContent>
+        </Card>
+      ) : viewMode === 'calendar' ? (
+        <CalendarWorkspace initialVisits={initialSiteVisits} />
+      ) : viewMode === 'kanban' ? (
+        <div className="w-full overflow-x-auto pb-4 snap-x">
+          <div className="flex gap-4 min-w-max px-1">
+            {LEAD_STAGE_ORDER.map((stage) => (
+              <div key={stage} className="w-72 shrink-0">
+                <div className="flex items-center gap-2 mb-3">
+                  <h3 className="text-sm font-semibold">{LEAD_STAGE_LABELS[stage]}</h3>
+                  <Badge variant="secondary" className="text-xs px-1.5 h-5">
+                    {grouped[stage].length}
+                  </Badge>
+                </div>
+
+                <div 
+                  className={cn(
+                    "space-y-3 p-2 rounded-xl transition-all duration-200 min-h-[500px]",
+                    draggedOverStage === stage 
+                      ? "bg-primary/5 border-2 border-dashed border-primary/20 scale-[1.01]" 
+                      : "border-2 border-transparent"
+                  )}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                  }}
+                  onDragEnter={() => setDraggedOverStage(stage)}
+                  onDragLeave={() => setDraggedOverStage(null)}
+                  onDrop={(e) => handleDrop(e, stage)}
+                >
+                  {grouped[stage].length === 0 ? (
+                    <div className="border border-dashed border-border/50 rounded-lg p-6 text-center">
+                      <p className="text-xs text-muted-foreground">No leads</p>
+                    </div>
+                  ) : (
+                    grouped[stage].map((lead) => (
+                      <Card
+                        key={lead.id}
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData('text/plain', lead.id);
+                          setIsDraggingLeadId(lead.id);
+                        }}
+                        onDragEnd={() => setIsDraggingLeadId(null)}
+                        className={cn(
+                          "border-border/50 border-t-2 animate-slide-up cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow",
+                          stageColors[stage],
+                          isDraggingLeadId === lead.id && "opacity-40 scale-95"
+                        )}
+                      >
+                        <CardContent className="pt-4 space-y-2.5">
+                          <div className="flex items-start justify-between">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-sm truncate">{lead.name}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                <PhoneLink phone={lead.phone} />
+                              </p>
+                            </div>
+                            <Link href={`/leads/${lead.id}`}>
+                              <Button variant="ghost" size="icon" className="h-7 w-7">
+                                <Eye className="h-3.5 w-3.5" />
+                              </Button>
+                            </Link>
+                          </div>
+
+                          {(lead.budget_min || lead.budget_max) && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <IndianRupee className="h-3 w-3" />
+                              {lead.budget_min ? `₹${lead.budget_min.toLocaleString('en-IN')}` : '—'} - {lead.budget_max ? `₹${lead.budget_max.toLocaleString('en-IN')}` : '—'}
+                            </p>
+                          )}
+
+                          {lead.preferred_locality && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <MapPin className="h-3 w-3" /> {lead.preferred_locality}
+                            </p>
+                          )}
+
+                          {lead.source && (
+                            <Badge className={`${stageBadgeColors[stage]} text-[10px]`}>
+                              {LEAD_SOURCE_LABELS[lead.source]}
+                            </Badge>
+                          )}
+
+                          {stage !== 'converted' && stage !== 'lost' && (
+                            <div className="flex justify-between pt-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs"
+                                disabled={stage === LEAD_STAGE_ORDER[0]}
+                                onClick={() => moveLead(lead.id, 'backward')}
+                              >
+                                <ChevronLeft className="h-3 w-3 mr-1" /> Back
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-primary animate-pulse"
+                                onClick={() => moveLead(lead.id, 'forward')}
+                              >
+                                Next <ChevronRight className="h-3 w-3 ml-1" />
+                              </Button>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <Card className="border-border/50">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Lead Info</TableHead>
+                  <TableHead>Budget Range</TableHead>
+                  <TableHead>Locality</TableHead>
+                  <TableHead>Source</TableHead>
+                  <TableHead>Stage</TableHead>
+                  <TableHead className="w-12"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {leads.map((lead) => (
+                  <TableRow key={lead.id} className="animate-fade-in">
+                    <TableCell>
+                      <div>
+                        <p className="font-semibold text-sm">{lead.name}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          <PhoneLink phone={lead.phone} />
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {lead.budget_min || lead.budget_max ? (
+                        <span className="flex items-center gap-0.5 text-sm">
+                          <IndianRupee className="h-3.5 w-3.5 text-muted-foreground" />
+                          {lead.budget_min ? lead.budget_min.toLocaleString('en-IN') : '0'} - {lead.budget_max ? lead.budget_max.toLocaleString('en-IN') : '∞'}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {lead.preferred_locality ? (
+                        <span className="flex items-center gap-1">
+                          <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                          {lead.preferred_locality}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {lead.source ? (
+                        <Badge variant="outline" className="text-xs">
+                          {LEAD_SOURCE_LABELS[lead.source]}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={stageBadgeColors[lead.status]}>
+                        {LEAD_STAGE_LABELS[lead.status]}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={`/leads/${lead.id}`}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+
+          <InfiniteScroll
+            hasMore={hasMore}
+            isLoading={isLoading}
+            onLoadMore={loadMore}
+            loadingText="Loading more leads..."
+            endText="All leads loaded"
+          />
+        </div>
+      )}
+
       <Dialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -238,7 +540,7 @@ export function LeadsClient({ initialLeads }: { initialLeads: Lead[] }) {
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <p className="text-sm text-muted-foreground">
-              Assign an available property to this lead. A tenant record will be created and a KYC link will be generated automatically.
+              Assign an available property to this lead. A tenant record will be created.
             </p>
             <div className="space-y-2">
               <Label>Available Property *</Label>
