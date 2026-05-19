@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import MapViewWrapper from '@/components/ui/map-view-wrapper';
 import { MediaDisplay } from '@/components/ui/media-display';
+import { PropertyGallery } from '@/components/properties/property-gallery';
 
 const statusColors: Record<string, string> = {
   draft: 'bg-muted text-muted-foreground',
@@ -61,28 +62,9 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Info */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Images */}
           <Card className="border-border/50 overflow-hidden">
             {property.images && property.images.length > 0 ? (
-              <div className="space-y-4 p-4 bg-muted/30">
-                <div className="h-96 w-full rounded-lg overflow-hidden relative border bg-black/5">
-                  <MediaDisplay
-                    url={property.images[0]} 
-                    alt={property.title}
-                    className="w-full h-full object-contain bg-black"
-                    controls={true}
-                  />
-                </div>
-                {property.images.length > 1 && (
-                  <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                    {property.images.slice(1).map((url: string, idx: number) => (
-                      <div key={idx} className="h-20 w-32 shrink-0 rounded-md overflow-hidden border bg-black/5 cursor-pointer hover:opacity-80 transition-opacity">
-                        <MediaDisplay url={url} alt={`Property view ${idx + 2}`} className="w-full h-full object-cover" />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <PropertyGallery images={property.images} title={property.title} />
             ) : (
               <div className="h-64 bg-gradient-to-br from-primary/10 to-chart-2/10 flex items-center justify-center relative">
                 <Building2 className="h-16 w-16 text-muted-foreground/20" />
