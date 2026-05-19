@@ -6,8 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Loader2, UploadCloud, X, FileVideo, FileAudio, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { MediaDisplay } from '@/components/ui/media-display';
-import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile, toBlobURL } from '@ffmpeg/util';
 
 interface MediaUploaderProps {
   value: string[];
@@ -17,69 +15,21 @@ interface MediaUploaderProps {
   bucket?: string;
 }
 
-export function MediaUploader({ 
-  value = [], 
-  onChange, 
+export function MediaUploader({
+  value = [],
+  onChange,
   maxFiles = 5,
   acceptedTypes = 'image/*,video/*,audio/*',
   bucket = 'media'
 }: MediaUploaderProps) {
   const [uploading, setUploading] = useState(false);
-  const [compressionProgress, setCompressionProgress] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const ffmpegRef = useRef<any>(null);
-
-  const loadFfmpeg = async () => {
-    if (!ffmpegRef.current) {
-      ffmpegRef.current = new FFmpeg();
-    }
-    const ffmpeg = ffmpegRef.current;
-    if (ffmpeg.loaded) return;
-    
-    ffmpeg.on('progress', ({ progress }) => {
-      // progress is a decimal from 0 to 1
-      const percent = Math.min(Math.round(progress * 100), 100);
-      setCompressionProgress(percent);
-    });
-
-    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd';
-    await ffmpeg.load({
-      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-    });
-  };
-
-  const compressVideo = async (file: File): Promise<File> => {
-    await loadFfmpeg();
-    const ffmpeg = ffmpegRef.current;
-    
-    const inputName = `input_${Date.now()}_${file.name}`;
-    const outputName = `output_${Date.now()}.mp4`;
-    
-    await ffmpeg.writeFile(inputName, await fetchFile(file));
-    
-    await ffmpeg.exec([
-      '-i', inputName,
-      '-vcodec', 'libx264',
-      '-crf', '28',
-      '-preset', 'ultrafast',
-      '-vf', "scale='min(854,iw)':-2", // Downscale to max 480p width to speed up single-threaded WASM
-      outputName
-    ]);
-    
-    const data = await ffmpeg.readFile(outputName);
-    
-    await ffmpeg.deleteFile(inputName);
-    await ffmpeg.deleteFile(outputName);
-    
-    return new File([data], file.name.replace(/\.[^/.]+$/, "") + ".mp4", { type: 'video/mp4' });
-  };
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
-    
+
     const files = Array.from(e.target.files);
-    
+
     if (value.length + files.length > maxFiles) {
       toast.error(`You can only upload up to ${maxFiles} files`);
       return;
@@ -90,29 +40,16 @@ export function MediaUploader({
 
     try {
       for (const file of files) {
-        // Enforce basic size limit (e.g., 200MB for media)
-        if (file.size > 200 * 1024 * 1024) {
-          toast.error(`${file.name} is too large (max 200MB)`);
+        // Enforce basic size limit (e.g., 50MB for media)
+        if (file.size > 50 * 1024 * 1024) {
+          toast.error(`${file.name} is too large (max 50MB)`);
           continue;
         }
 
-        let fileToUpload = file;
-        if (file.type.startsWith('video/')) {
-          setCompressionProgress(0);
-          try {
-            fileToUpload = await compressVideo(file);
-          } catch (e) {
-            console.error('Video compression failed, falling back to original', e);
-            toast.error('Video compression failed, uploading original file');
-          } finally {
-            setCompressionProgress(null);
-          }
-        }
-
-        const url = await uploadMedia(fileToUpload, bucket);
+        const url = await uploadMedia(file, bucket);
         newUrls.push(url);
       }
-      
+
       onChange([...value, ...newUrls]);
       if (newUrls.length > 0) {
         toast.success(`Successfully uploaded ${newUrls.length} file(s)`);
@@ -141,8 +78,8 @@ export function MediaUploader({
   const renderPreview = (url: string) => {
     return (
       <div className="relative w-full h-24 bg-black/5 rounded-md flex items-center justify-center overflow-hidden group">
-        <MediaDisplay 
-          url={url} 
+        <MediaDisplay
+          url={url}
           className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
           autoPlayHover={true}
         />
@@ -165,7 +102,7 @@ export function MediaUploader({
             </button>
           </div>
         ))}
-        
+
         {value.length < maxFiles && (
           <button
             type="button"
@@ -174,16 +111,7 @@ export function MediaUploader({
             className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-border rounded-md hover:border-primary/50 hover:bg-primary/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {uploading ? (
-              <div className="flex flex-col items-center justify-center">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mb-2" />
-                {compressionProgress !== null ? (
-                  <span className="text-[10px] text-muted-foreground font-medium text-center leading-tight">
-                    Compressing<br/>{compressionProgress}%
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-muted-foreground font-medium">Uploading...</span>
-                )}
-              </div>
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             ) : (
               <>
                 <UploadCloud className="h-5 w-5 text-muted-foreground mb-2" />
@@ -193,7 +121,7 @@ export function MediaUploader({
           </button>
         )}
       </div>
-      
+
       <input
         ref={fileInputRef}
         type="file"
