@@ -5,7 +5,7 @@ import { LeaseActionsWorkspace } from '@/components/leases/lease-actions-workspa
 import { notFound } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -17,6 +17,7 @@ import {
   TrendingUp, Clock, Shield, FileText, ExternalLink, AlertTriangle,
 } from 'lucide-react';
 import { LEASE_STATUS_LABELS, PAYMENT_STATUS_LABELS } from '@/types/database';
+import { cn } from '@/lib/utils';
 
 const statusColors: Record<string, string> = {
   draft: 'bg-muted text-muted-foreground',
@@ -79,10 +80,8 @@ export default async function LeaseDetailPage({ params }: { params: Promise<{ id
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/leases">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
+        <Link href="/leases" className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}>
+          <ArrowLeft className="h-4 w-4" />
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3">

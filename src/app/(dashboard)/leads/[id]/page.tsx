@@ -5,7 +5,7 @@ import type { LeadStatus, LeadSource } from '@/types/database';
 import { LEAD_STAGE_LABELS, LEAD_SOURCE_LABELS } from '@/types/database';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -16,6 +16,7 @@ import {
 import { AddFollowUpDialog } from '@/components/leads/add-follow-up';
 import { MediaDisplay } from '@/components/ui/media-display';
 import { PhoneLink } from '@/components/ui/phone-link';
+import { cn } from '@/lib/utils';
 
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -52,10 +53,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/leads">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
+        <Link href="/leads" className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}>
+          <ArrowLeft className="h-4 w-4" />
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3">
@@ -217,10 +216,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                           <span className="flex items-center gap-1 font-medium text-foreground"><IndianRupee className="h-3 w-3" />{prop.rent.toLocaleString('en-IN')}</span>
                         </div>
                       </div>
-                      <Link href={`/properties/${prop.id}`}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
+                      <Link href={`/properties/${prop.id}`} className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), "h-8 w-8")}>
+                        <ExternalLink className="h-4 w-4" />
                       </Link>
                     </div>
                   ))}

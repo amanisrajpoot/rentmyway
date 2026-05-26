@@ -32,6 +32,7 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { PDFGenerator } from '@/lib/utils/pdf-generator';
+import { PageLayout, PageHeader, PageToolbar, PageContent } from '@/components/layout/page-layout';
 
 export function CommissionsClient({ initialCommissions, stats }: { initialCommissions: any[], stats: any }) {
   const router = useRouter();
@@ -130,56 +131,13 @@ export function CommissionsClient({ initialCommissions, stats }: { initialCommis
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="border-border/50 bg-background/50 backdrop-blur-sm">
-          <CardContent className="pt-4 flex items-center gap-4">
-            <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
-              <TrendingUp className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">Total Revenue</p>
-              <p className="text-xl font-bold">₹{stats.total.toLocaleString()}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50 bg-background/50 backdrop-blur-sm">
-          <CardContent className="pt-4 flex items-center gap-4">
-            <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500">
-              <CheckCircle2 className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">Received</p>
-              <p className="text-xl font-bold">₹{stats.received.toLocaleString()}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50 bg-background/50 backdrop-blur-sm">
-          <CardContent className="pt-4 flex items-center gap-4">
-            <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-500">
-              <Clock className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">Pending Payouts</p>
-              <p className="text-xl font-bold">₹{stats.pending.toLocaleString()}</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="relative max-w-sm w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search deals..." 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 bg-card border-border/50"
-          />
-        </div>
+    <PageLayout>
+      <PageHeader 
+        title="Broker Commissions"
+        description="Track and manage deal commissions and payouts"
+      >
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger render={<Button className="bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white" />}>
+          <DialogTrigger render={<Button className="w-full sm:w-auto bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white" />}>
             <Plus className="h-4 w-4 mr-2" />
             Record Commission
           </DialogTrigger>
@@ -193,7 +151,13 @@ export function CommissionsClient({ initialCommissions, stats }: { initialCommis
                   <Label>Property *</Label>
                   <Select name="property_id" onValueChange={(val: string | null) => setSelectedProperty(val || '')} required>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select property" />
+                      <SelectValue placeholder="Select property">
+                        {(value) => {
+                          if (!value) return null;
+                          const prop = properties.find(p => p.id === value);
+                          return prop ? prop.title : null;
+                        }}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {properties.map(p => (
@@ -206,7 +170,13 @@ export function CommissionsClient({ initialCommissions, stats }: { initialCommis
                   <Label>Tenant *</Label>
                   <Select name="tenant_id" required>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select tenant" />
+                      <SelectValue placeholder="Select tenant">
+                        {(value) => {
+                          if (!value) return null;
+                          const t = tenants.find(x => x.id === value);
+                          return t ? t.name : null;
+                        }}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {tenants.map(t => (
@@ -222,7 +192,17 @@ export function CommissionsClient({ initialCommissions, stats }: { initialCommis
                   <Label>Comm. Type</Label>
                   <Select name="commission_type" value={commType} onValueChange={(val: string | null) => setCommType(val || 'one_month_rent')}>
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue>
+                        {(value) => {
+                          if (!value) return null;
+                          const types: Record<string, string> = {
+                            one_month_rent: 'One Month Rent',
+                            percentage: 'Percentage (%)',
+                            fixed: 'Fixed Amount'
+                          };
+                          return types[value] || null;
+                        }}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="one_month_rent">One Month Rent</SelectItem>
@@ -263,9 +243,61 @@ export function CommissionsClient({ initialCommissions, stats }: { initialCommis
             </form>
           </DialogContent>
         </Dialog>
+      </PageHeader>
+
+      <PageContent>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <Card className="border-border/50 bg-background/50 backdrop-blur-sm">
+          <CardContent className="pt-4 flex items-center gap-4">
+            <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+              <TrendingUp className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">Total Revenue</p>
+              <p className="text-xl font-bold">₹{stats.total.toLocaleString()}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50 bg-background/50 backdrop-blur-sm">
+          <CardContent className="pt-4 flex items-center gap-4">
+            <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">Received</p>
+              <p className="text-xl font-bold">₹{stats.received.toLocaleString()}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50 bg-background/50 backdrop-blur-sm">
+          <CardContent className="pt-4 flex items-center gap-4">
+            <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-500">
+              <Clock className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">Pending Payouts</p>
+              <p className="text-xl font-bold">₹{stats.pending.toLocaleString()}</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-4">
+      </PageContent>
+
+      <PageToolbar>
+        <div className="relative max-w-sm w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Search deals..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 bg-card border-border/50"
+          />
+        </div>
+      </PageToolbar>
+
+      <PageContent className="space-y-4">
         {filtered.length === 0 ? (
           <Card className="border-border/50 border-dashed">
             <CardContent className="py-20 text-center">
@@ -367,7 +399,7 @@ export function CommissionsClient({ initialCommissions, stats }: { initialCommis
             </Card>
           ))
         )}
-      </div>
-    </div>
+      </PageContent>
+    </PageLayout>
   );
 }

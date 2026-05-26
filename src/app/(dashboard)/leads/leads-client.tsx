@@ -6,7 +6,7 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import type { Lead, LeadStatus } from '@/types/database';
 import { LEAD_STAGE_ORDER, LEAD_STAGE_LABELS, LEAD_SOURCE_LABELS } from '@/types/database';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { InfiniteScroll } from '@/components/ui/infinite-scroll';
 import { exportToCSV } from '@/lib/utils/export';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { PageLayout, PageHeader, PageToolbar, PageContent } from '@/components/layout/page-layout';
 
 const stageColors: Record<LeadStatus, string> = {
   new: 'border-t-blue-500',
@@ -248,64 +249,60 @@ export function LeadsClient({ initialLeads, initialSiteVisits, initialFilters }:
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Lead Pipeline</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Manage and track active sales inquiries
-          </p>
-        </div>
-        <div className="flex items-center gap-3 self-stretch sm:self-auto">
-          <div className="flex bg-muted p-1 rounded-lg shrink-0">
-            <Button
-              variant={viewMode === 'kanban' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-8 px-3"
-              onClick={() => setViewMode('kanban')}
-            >
-              <Kanban className="h-4 w-4 mr-1.5" />
-              Kanban
-            </Button>
-            <Button
-              variant={viewMode === 'list' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-8 px-3"
-              onClick={() => setViewMode('list')}
-            >
-              <List className="h-4 w-4 mr-1.5" />
-              List
-            </Button>
-            <Button
-              variant={viewMode === 'calendar' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-8 px-3"
-              onClick={() => setViewMode('calendar')}
-            >
-              <LucideCalendar className="h-4 w-4 mr-1.5" />
-              Calendar
-            </Button>
-          </div>
-
-          <Button 
-            onClick={handleExportCSV}
-            variant="outline"
-            className="border-primary/20 hover:bg-primary/5 text-primary"
+    <PageLayout>
+      <PageHeader 
+        title="Lead Pipeline"
+        description="Manage and track active sales inquiries"
+      >
+        <div className="flex bg-muted p-1 rounded-lg shrink-0 w-full sm:w-auto overflow-x-auto">
+          <Button
+            variant={viewMode === 'kanban' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-8 px-3 flex-1 sm:flex-none"
+            onClick={() => setViewMode('kanban')}
           >
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
+            <Kanban className="h-4 w-4 mr-1.5" />
+            Kanban
           </Button>
-
-          <Link href="/leads/new" className="flex-1 sm:flex-initial">
-            <Button className="w-full bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white shadow-lg shadow-primary/20">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Lead
-            </Button>
-          </Link>
+          <Button
+            variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-8 px-3 flex-1 sm:flex-none"
+            onClick={() => setViewMode('list')}
+          >
+            <List className="h-4 w-4 mr-1.5" />
+            List
+          </Button>
+          <Button
+            variant={viewMode === 'calendar' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-8 px-3 flex-1 sm:flex-none"
+            onClick={() => setViewMode('calendar')}
+          >
+            <LucideCalendar className="h-4 w-4 mr-1.5" />
+            Calendar
+          </Button>
         </div>
-      </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
+        <Button 
+          onClick={handleExportCSV}
+          variant="outline"
+          className="border-primary/20 hover:bg-primary/5 text-primary w-full sm:w-auto"
+        >
+          <Download className="h-4 w-4 mr-2" />
+          Export CSV
+        </Button>
+
+        <Link 
+          href="/leads/new" 
+          className={cn(buttonVariants({ size: 'default' }), "w-full sm:w-auto flex-1 sm:flex-initial bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white shadow-lg shadow-primary/20")}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Add Lead
+        </Link>
+      </PageHeader>
+
+      <PageToolbar>
         <div className="relative flex-1 sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
@@ -316,7 +313,7 @@ export function LeadsClient({ initialLeads, initialSiteVisits, initialFilters }:
           />
         </div>
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? 'all')}>
-          <SelectTrigger className="w-[160px] bg-card">
+          <SelectTrigger className="w-full sm:w-[160px] bg-card">
             <SelectValue placeholder="All Stages" />
           </SelectTrigger>
           <SelectContent>
@@ -326,8 +323,9 @@ export function LeadsClient({ initialLeads, initialSiteVisits, initialFilters }:
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </PageToolbar>
 
+      <PageContent>
       {leads.length === 0 ? (
         <Card className="border-border/50 border-dashed">
           <CardContent className="py-16 text-center">
@@ -532,6 +530,7 @@ export function LeadsClient({ initialLeads, initialSiteVisits, initialFilters }:
           />
         </div>
       )}
+      </PageContent>
 
       <Dialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
         <DialogContent className="sm:max-w-md">
@@ -569,6 +568,6 @@ export function LeadsClient({ initialLeads, initialSiteVisits, initialFilters }:
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageLayout>
   );
 }

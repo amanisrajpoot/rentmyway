@@ -6,7 +6,7 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import type { LeaseAgreement } from '@/types/database';
 import { LEASE_STATUS_LABELS } from '@/types/database';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -19,6 +19,8 @@ import {
 import { getLeases } from '@/lib/actions/leases';
 import { InfiniteScroll } from '@/components/ui/infinite-scroll';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { PageLayout, PageHeader, PageToolbar, PageContent } from '@/components/layout/page-layout';
 
 const statusColors: Record<string, string> = {
   draft: 'bg-muted text-muted-foreground',
@@ -120,25 +122,23 @@ export function LeasesClient({ initialLeases, stats, initialFilters }: LeasesCli
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Lease Agreements</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Manage lease lifecycle, renewals and escalations
-          </p>
-        </div>
-        <Link href="/leases/new">
-          <Button className="bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white">
-            <Plus className="h-4 w-4 mr-2" />
-            New Lease
-          </Button>
+    <PageLayout>
+      <PageHeader 
+        title="Lease Agreements"
+        description="Manage lease lifecycle, renewals and escalations"
+      >
+        <Link 
+          href="/leases/new" 
+          className={cn(buttonVariants({ size: 'default' }), "w-full sm:w-auto flex-1 sm:flex-initial bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white")}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          New Lease
         </Link>
-      </div>
+      </PageHeader>
 
+      <PageContent>
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
         <Card className="border-border/50 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-[oklch(0.60_0.19_160)] to-[oklch(0.55_0.18_180)] opacity-[0.06]" />
           <CardContent className="pt-5 flex items-center gap-4">
@@ -179,9 +179,10 @@ export function LeasesClient({ initialLeases, stats, initialFilters }: LeasesCli
         </Card>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 max-w-sm">
+      </PageContent>
+
+      <PageToolbar>
+        <div className="relative flex-1 w-full sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by tenant or property..."
@@ -191,7 +192,7 @@ export function LeasesClient({ initialLeases, stats, initialFilters }: LeasesCli
           />
         </div>
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? 'all')}>
-          <SelectTrigger className="w-[160px] bg-card">
+          <SelectTrigger className="w-full sm:w-[160px] bg-card">
             <SelectValue placeholder="All Status" />
           </SelectTrigger>
           <SelectContent>
@@ -201,9 +202,9 @@ export function LeasesClient({ initialLeases, stats, initialFilters }: LeasesCli
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </PageToolbar>
 
-      {/* Lease List */}
+      <PageContent>
       {leases.length === 0 ? (
         <Card className="border-border/50 border-dashed">
           <CardContent className="py-16 text-center">
@@ -313,6 +314,7 @@ export function LeasesClient({ initialLeases, stats, initialFilters }: LeasesCli
           />
         </div>
       )}
-    </div>
+      </PageContent>
+    </PageLayout>
   );
 }

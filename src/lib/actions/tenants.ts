@@ -94,3 +94,51 @@ export async function regenerateKycLink(tenantId: string) {
   revalidatePath(`/tenants/${tenantId}`);
   return kycToken;
 }
+
+export async function createDirectTenant(data: {
+  name: string;
+  phone: string;
+  email?: string;
+  property_id: string;
+  rent_amount: number;
+  deposit_amount: number;
+  move_in_date: string;
+}) {
+  const supabase = await createClient();
+  const profile = await getUserProfile();
+  if (!profile) throw new Error('Not authenticated');
+
+  const kycToken = crypto.randomBytes(32).toString('hex');
+  const kycTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+  const { data: tenant, error } = await supabase
+    .from('tenants')
+    .insert({
+      broker_id: profile.id,
+      property_id: data.property_id,
+      name: data.name,
+      phone: data.phone,
+      email: data.email || null,
+      rent_amount: data.rent_amount,
+      deposit_amount: data.deposit_amount,
+      move_in_date: data.move_in_date,
+      is_active: true,
+      kyc_token: kycToken,
+      kyc_token_expiry: kycTokenExpiry,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  // Mark property as rented
+  await supabase
+    .from('properties')
+    .update({ status: 'rented', updated_at: new Date().toISOString() })
+    .eq('id', data.property_id);
+
+  revalidatePath('/tenants');
+  revalidatePath('/properties');
+
+  return tenant;
+}

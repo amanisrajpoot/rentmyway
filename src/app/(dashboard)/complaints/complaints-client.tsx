@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import type { Complaint } from '@/types/database';
 import { COMPLAINT_STATUS_LABELS } from '@/types/database';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,6 +18,8 @@ import {
   MessageSquareWarning, Building2, User, Wrench, AlertTriangle,
   Clock, CheckCircle, XCircle, Plus, Search,
 } from 'lucide-react';
+import { PageLayout, PageHeader, PageToolbar, PageContent } from '@/components/layout/page-layout';
+import { cn } from '@/lib/utils';
 
 const statusColors: Record<string, string> = {
   open: 'bg-red-500/15 text-red-400 border-red-500/20',
@@ -118,27 +120,22 @@ export function ComplaintsClient({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Complaints</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Track maintenance issues and complaints
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <Link href="/complaints/new">
-            <Button className="bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white">
-              <Plus className="h-4 w-4 mr-2" />
-              New Complaint
-            </Button>
-          </Link>
-        </div>
-      </div>
+    <PageLayout>
+      <PageHeader 
+        title="Complaints"
+        description="Track maintenance issues and complaints"
+      >
+        <Link 
+          href="/complaints/new" 
+          className={cn(buttonVariants({ size: 'default' }), "w-full sm:w-auto flex-1 sm:flex-initial bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white")}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          New Complaint
+        </Link>
+      </PageHeader>
 
-      {/* Global Toolbar for Search & Status Filter */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <PageToolbar>
+        <div className="relative flex-1 w-full sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search complaints by title, tenant or property..."
@@ -148,7 +145,7 @@ export function ComplaintsClient({
           />
         </div>
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? 'all')}>
-          <SelectTrigger className="w-[160px] bg-card">
+          <SelectTrigger className="w-full sm:w-[160px] bg-card">
             <SelectValue placeholder="All Status" />
           </SelectTrigger>
           <SelectContent>
@@ -158,8 +155,9 @@ export function ComplaintsClient({
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </PageToolbar>
 
+      <PageContent>
       {complaints.length === 0 ? (
         <Card className="border-border/50">
           <CardContent className="py-16 text-center">
@@ -284,6 +282,7 @@ export function ComplaintsClient({
           />
         </div>
       )}
-    </div>
+      </PageContent>
+    </PageLayout>
   );
 }

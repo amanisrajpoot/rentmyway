@@ -4,7 +4,7 @@ import type { PropertyType, FurnishingType } from '@/types/database';
 import { PROPERTY_TYPE_LABELS, FURNISHING_LABELS } from '@/types/database';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import {
@@ -14,6 +14,7 @@ import {
 import MapViewWrapper from '@/components/ui/map-view-wrapper';
 import { MediaDisplay } from '@/components/ui/media-display';
 import { PropertyGallery } from '@/components/properties/property-gallery';
+import { cn } from '@/lib/utils';
 
 const statusColors: Record<string, string> = {
   draft: 'bg-muted text-muted-foreground',
@@ -36,10 +37,8 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/properties">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
+        <Link href="/properties" className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}>
+          <ArrowLeft className="h-4 w-4" />
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3">
@@ -51,11 +50,9 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
             {property.locality}, {property.city}, {property.state}
           </p>
         </div>
-        <Link href={`/properties/${id}/edit`}>
-          <Button variant="outline">
-            <Edit className="h-4 w-4 mr-2" />
-            Edit
-          </Button>
+        <Link href={`/properties/${id}/edit`} className={cn(buttonVariants({ variant: 'outline' }))}>
+          <Edit className="h-4 w-4 mr-2" />
+          Edit
         </Link>
       </div>
 

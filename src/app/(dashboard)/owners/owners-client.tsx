@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { createOwner } from '@/lib/actions/properties';
 import { toast } from 'sonner';
+import { PageLayout, PageHeader, PageToolbar, PageContent } from '@/components/layout/page-layout';
 
 export function OwnersClient({ initialOwners }: { initialOwners: Owner[] }) {
   const router = useRouter();
@@ -61,16 +62,13 @@ export function OwnersClient({ initialOwners }: { initialOwners: Owner[] }) {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Owners</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Manage property owners ({initialOwners.length} total)
-          </p>
-        </div>
+    <PageLayout>
+      <PageHeader 
+        title="Owners"
+        description={`Manage property owners (${initialOwners.length} total)`}
+      >
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger render={<Button className="bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white" />}>
+          <DialogTrigger render={<Button className="w-full sm:w-auto bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white" />}>
             <Plus className="h-4 w-4 mr-2" />
             Add Owner
           </DialogTrigger>
@@ -105,20 +103,21 @@ export function OwnersClient({ initialOwners }: { initialOwners: Owner[] }) {
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+      </PageHeader>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search owners..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-10 bg-card"
-        />
-      </div>
+      <PageToolbar>
+        <div className="relative w-full sm:max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search owners..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 bg-card"
+          />
+        </div>
+      </PageToolbar>
 
-      {/* Table */}
+      <PageContent>
       {filtered.length === 0 ? (
         <Card className="border-border/50 border-dashed">
           <CardContent className="py-16 text-center">
@@ -189,6 +188,7 @@ export function OwnersClient({ initialOwners }: { initialOwners: Owner[] }) {
           </Table>
         </Card>
       )}
-    </div>
+      </PageContent>
+    </PageLayout>
   );
 }

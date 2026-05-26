@@ -10,14 +10,12 @@ import {
   Home,
   Wrench,
   ScrollText,
-  Receipt,
   Bell,
   Zap,
-  CalendarClock,
   Wallet,
   Megaphone,
   BarChart3,
-  PieChart,
+  PieChart
 } from 'lucide-react';
 import { type UserRole } from '@/types/database';
 
@@ -44,21 +42,21 @@ export const navConfig: NavGroup[] = [
         icon: LayoutDashboard,
         roles: ['broker', 'owner', 'tenant'],
       },
+      {
+        title: 'Analytics',
+        href: '/analytics',
+        icon: BarChart3,
+        roles: ['broker', 'owner'],
+      },
     ],
   },
   {
-    label: 'Property Management',
+    label: 'Properties',
     items: [
       {
         title: 'Properties',
         href: '/properties',
         icon: Building2,
-        roles: ['broker', 'tenant'],
-      },
-      {
-        title: 'Owners',
-        href: '/owners',
-        icon: Users,
         roles: ['broker'],
       },
       {
@@ -73,10 +71,28 @@ export const navConfig: NavGroup[] = [
         icon: Home,
         roles: ['tenant'],
       },
+      {
+        title: 'Leases',
+        href: '/leases',
+        icon: ScrollText,
+        roles: ['broker'],
+      },
+      {
+        title: 'Leases',
+        href: '/owner/leases',
+        icon: ScrollText,
+        roles: ['owner'],
+      },
+      {
+        title: 'My Lease',
+        href: '/tenant/lease',
+        icon: ScrollText,
+        roles: ['tenant'],
+      },
     ],
   },
   {
-    label: 'CRM',
+    label: 'People',
     items: [
       {
         title: 'Leads',
@@ -90,28 +106,57 @@ export const navConfig: NavGroup[] = [
         icon: UserCheck,
         roles: ['broker'],
       },
+      {
+        title: 'Owners',
+        href: '/owners',
+        icon: Users,
+        roles: ['broker'],
+      },
+    ],
+  },
+  {
+    label: 'Financials',
+    items: [
+      {
+        title: 'Payments',
+        href: '/payments',
+        icon: IndianRupee,
+        roles: ['broker', 'tenant'],
+      },
+      {
+        title: 'Utility Bills',
+        href: '/utility-bills',
+        icon: Zap,
+        roles: ['broker'],
+      },
+      {
+        title: 'Commissions',
+        href: '/commissions',
+        icon: PieChart,
+        roles: ['broker'],
+      },
+      {
+        title: 'Financials',
+        href: '/owner/financials',
+        icon: Wallet,
+        roles: ['owner'],
+      },
     ],
   },
   {
     label: 'Operations',
     items: [
       {
-        title: 'Leases',
-        href: '/leases',
-        icon: ScrollText,
-        roles: ['broker'],
-      },
-      {
-        title: 'Payments',
-        href: '/payments',
-        icon: IndianRupee,
-        roles: ['broker'],
-      },
-      {
         title: 'Maintenance',
         href: '/maintenance',
         icon: Wrench,
         roles: ['broker'],
+      },
+      {
+        title: 'Maintenance',
+        href: '/owner/maintenance',
+        icon: Wrench,
+        roles: ['owner'],
       },
       {
         title: 'Complaints',
@@ -120,23 +165,10 @@ export const navConfig: NavGroup[] = [
         roles: ['broker', 'owner', 'tenant'],
       },
       {
-        title: 'Utility Bills',
-        href: '/utility-bills',
-        icon: Zap,
+        title: 'Announcements',
+        href: '/announcements',
+        icon: Megaphone,
         roles: ['broker'],
-      },
-      // Owner operations
-      {
-        title: 'Leases',
-        href: '/owner/leases',
-        icon: ScrollText,
-        roles: ['owner'],
-      },
-      {
-        title: 'Financials',
-        href: '/owner/financials',
-        icon: Wallet,
-        roles: ['owner'],
       },
       {
         title: 'Documents',
@@ -145,57 +177,10 @@ export const navConfig: NavGroup[] = [
         roles: ['owner'],
       },
       {
-        title: 'Maintenance',
-        href: '/owner/maintenance',
-        icon: Wrench,
-        roles: ['owner'],
-      },
-      // Tenant operations
-      {
-        title: 'Lease',
-        href: '/tenant/lease',
-        icon: ScrollText,
-        roles: ['tenant'],
-      },
-      {
-        title: 'Payments',
-        href: '/tenant/payments',
-        icon: IndianRupee,
-        roles: ['tenant'],
-      },
-      {
         title: 'Documents',
         href: '/tenant/documents',
         icon: FileText,
         roles: ['tenant'],
-      },
-    ],
-  },
-  {
-    label: 'Communication',
-    items: [
-      {
-        title: 'Announcements',
-        href: '/announcements',
-        icon: Megaphone,
-        roles: ['broker'],
-      },
-    ],
-  },
-  {
-    label: 'Business',
-    items: [
-      {
-        title: 'Commissions',
-        href: '/commissions',
-        icon: PieChart,
-        roles: ['broker'],
-      },
-      {
-        title: 'Analytics',
-        href: '/analytics',
-        icon: BarChart3,
-        roles: ['broker', 'owner'],
       },
     ],
   },

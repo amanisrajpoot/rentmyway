@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -15,6 +15,7 @@ import { createClient } from '@/lib/supabase/client';
 import { MediaUploader } from '@/components/ui/media-uploader';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { TenantFormDialog } from '@/components/tenant/tenant-form-dialog';
 
 type TenantOption = {
   id: string;
@@ -45,6 +46,21 @@ export default function NewLeasePage() {
     }
     load();
   }, []);
+
+  const handleTenantCreated = (tenant: any) => {
+    // Reload tenants and select the new one
+    const load = async () => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('tenants')
+        .select('id, name, phone, property_id, rent_amount, deposit_amount, property:properties(title)')
+        .eq('is_active', true)
+        .order('name');
+      setTenants(data || []);
+      setSelectedTenant(tenant.id);
+    };
+    load();
+  };
 
   const activeTenant = tenants.find(t => t.id === selectedTenant);
 
@@ -107,10 +123,8 @@ export default function NewLeasePage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
       <div className="flex items-center gap-4">
-        <Link href="/leases">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
+        <Link href="/leases" className={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+          <ArrowLeft className="h-4 w-4" />
         </Link>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">New Lease Agreement</h1>
@@ -132,18 +146,32 @@ export default function NewLeasePage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Select Tenant *</Label>
-              <Select value={selectedTenant} onValueChange={(val) => setSelectedTenant(val ?? '')}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select an active tenant" />
-                </SelectTrigger>
-                <SelectContent>
-                  {tenants.map(t => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.name} — {Array.isArray(t.property) ? t.property[0]?.title : (t.property as any)?.title || 'Unknown'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <Select value={selectedTenant} onValueChange={(val) => setSelectedTenant(val ?? '')}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select an active tenant">
+                      {(value) => {
+                        if (!value) return null;
+                        const t = tenants.find(x => x.id === value);
+                        if (!t) return null;
+                        const propTitle = Array.isArray(t.property) ? t.property[0]?.title : (t.property as any)?.title || 'Unknown';
+                        return `${t.name} — ${propTitle}`;
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tenants.map(t => {
+                      const propTitle = Array.isArray(t.property) ? t.property[0]?.title : (t.property as any)?.title || 'Unknown';
+                      return (
+                        <SelectItem key={t.id} value={t.id} label={`${t.name} — ${propTitle}`}>
+                          {`${t.name} — ${propTitle}`}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+                <TenantFormDialog onSuccess={handleTenantCreated} />
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -187,6 +215,7 @@ export default function NewLeasePage() {
               <div className="space-y-2">
                 <Label>Monthly Rent (₹) *</Label>
                 <Input
+                  key={`rent-${activeTenant?.id || 'empty'}`}
                   name="monthly_rent"
                   type="number"
                   required
@@ -197,6 +226,7 @@ export default function NewLeasePage() {
               <div className="space-y-2">
                 <Label>Security Deposit (₹) *</Label>
                 <Input
+                  key={`deposit-${activeTenant?.id || 'empty'}`}
                   name="security_deposit"
                   type="number"
                   required
@@ -254,8 +284,8 @@ export default function NewLeasePage() {
 
         {/* Submit */}
         <div className="flex justify-end gap-3">
-          <Link href="/leases">
-            <Button type="button" variant="outline">Cancel</Button>
+          <Link href="/leases" className={buttonVariants({ variant: 'outline' })}>
+            Cancel
           </Link>
           <Button
             type="submit"

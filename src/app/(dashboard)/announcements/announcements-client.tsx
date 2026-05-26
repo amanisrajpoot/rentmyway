@@ -16,9 +16,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
 import { createAnnouncement, deleteAnnouncement } from '@/lib/actions/announcements';
-import { createClient } from '@/lib/supabase/client';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { createClient } from '@/lib/supabase/client';
+import { PageLayout, PageHeader, PageToolbar, PageContent } from '@/components/layout/page-layout';
 
 export function AnnouncementsClient({ initialAnnouncements }: { initialAnnouncements: any[] }) {
   const router = useRouter();
@@ -82,19 +83,13 @@ export function AnnouncementsClient({ initialAnnouncements }: { initialAnnouncem
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="relative max-w-sm w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search announcements..." 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 bg-card"
-          />
-        </div>
+    <PageLayout>
+      <PageHeader 
+        title="Broadcasts"
+        description="Broadcast announcements to tenants and owners"
+      >
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger render={<Button className="bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white" />}>
+          <DialogTrigger render={<Button className="w-full sm:w-auto bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white" />}>
             <Megaphone className="h-4 w-4 mr-2" />
             New Announcement
           </DialogTrigger>
@@ -150,8 +145,21 @@ export function AnnouncementsClient({ initialAnnouncements }: { initialAnnouncem
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+      </PageHeader>
 
+      <PageToolbar>
+        <div className="relative max-w-sm w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Search announcements..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 bg-card"
+          />
+        </div>
+      </PageToolbar>
+
+      <PageContent>
       <div className="grid grid-cols-1 gap-4">
         {filtered.length === 0 ? (
           <Card className="border-border/50 border-dashed">
@@ -211,6 +219,7 @@ export function AnnouncementsClient({ initialAnnouncements }: { initialAnnouncem
           ))
         )}
       </div>
-    </div>
+      </PageContent>
+    </PageLayout>
   );
 }

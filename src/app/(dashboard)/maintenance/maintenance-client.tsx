@@ -6,7 +6,7 @@ import type { MaintenanceSchedule } from '@/types/database';
 import { COMPLAINT_CATEGORY_LABELS } from '@/types/database';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -24,6 +24,8 @@ import {
 import { createMaintenanceSchedule, completeMaintenanceTask } from '@/lib/actions/maintenance';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import { PageLayout, PageHeader, PageToolbar, PageContent } from '@/components/layout/page-layout';
+import Link from 'next/link';
 
 const categoryIcons: Record<string, any> = {
   plumbing: 'Droplets',
@@ -113,18 +115,15 @@ export function MaintenanceClient({ initialSchedule }: { initialSchedule: Mainte
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Maintenance Schedule</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Manage recurring property maintenance and inspections
-          </p>
-        </div>
+    <PageLayout>
+      <PageHeader 
+        title="Maintenance Schedule"
+        description="Manage recurring property maintenance and inspections"
+      >
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger render={<Button className="bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white" />}>
+          <DialogTrigger render={<Button className="w-full sm:w-auto bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white" />}>
             <Plus className="h-4 w-4 mr-2" />
-            Schedule Task
+            Schedule Maintenance
           </DialogTrigger>
           <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
@@ -133,16 +132,27 @@ export function MaintenanceClient({ initialSchedule }: { initialSchedule: Mainte
             <form onSubmit={handleCreate} className="space-y-4 pt-2">
               <div className="space-y-2">
                 <Label>Property *</Label>
-                <Select value={selectedProperty} onValueChange={(val) => setSelectedProperty(val ?? '')} required>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select property" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {properties.map(p => (
-                      <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  <Select value={selectedProperty} onValueChange={(val) => setSelectedProperty(val ?? '')} required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select property">
+                        {(value) => {
+                          if (!value) return null;
+                          const prop = properties.find(p => p.id === value);
+                          return prop ? prop.title : null;
+                        }}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {properties.map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Link href="/properties/new" className={buttonVariants({ variant: 'outline', size: 'icon' })} title="Add Property">
+                    <Plus className="h-4 w-4" />
+                  </Link>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -153,7 +163,12 @@ export function MaintenanceClient({ initialSchedule }: { initialSchedule: Mainte
                   <Label>Category</Label>
                   <Select name="category" defaultValue="other">
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue>
+                        {(value) => {
+                          if (!value) return null;
+                          return COMPLAINT_CATEGORY_LABELS[value as keyof typeof COMPLAINT_CATEGORY_LABELS] || null;
+                        }}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {Object.entries(COMPLAINT_CATEGORY_LABELS).map(([k, v]) => (
@@ -168,7 +183,19 @@ export function MaintenanceClient({ initialSchedule }: { initialSchedule: Mainte
                   <Label>Frequency *</Label>
                   <Select name="frequency" defaultValue="monthly">
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue>
+                        {(value) => {
+                          if (!value) return null;
+                          const freqs: Record<string, string> = {
+                            monthly: 'Monthly',
+                            quarterly: 'Quarterly',
+                            half_yearly: 'Half Yearly',
+                            yearly: 'Yearly',
+                            custom: 'Custom Days'
+                          };
+                          return freqs[value] || null;
+                        }}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="monthly">Monthly</SelectItem>
@@ -208,7 +235,21 @@ export function MaintenanceClient({ initialSchedule }: { initialSchedule: Mainte
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+      </PageHeader>
+
+      <PageToolbar>
+        <div className="relative flex-1 w-full sm:max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by task or property..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 bg-card"
+          />
+        </div>
+      </PageToolbar>
+
+      <PageContent className="space-y-6">
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -254,16 +295,7 @@ export function MaintenanceClient({ initialSchedule }: { initialSchedule: Mainte
         </Card>
       </div>
 
-      {/* Filters */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by task or property..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-10 bg-card"
-        />
-      </div>
+
 
       {/* Schedule List */}
       {filtered.length === 0 ? (
@@ -334,6 +366,7 @@ export function MaintenanceClient({ initialSchedule }: { initialSchedule: Mainte
           })}
         </div>
       )}
-    </div>
+      </PageContent>
+    </PageLayout>
   );
 }

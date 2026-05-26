@@ -30,6 +30,8 @@ import { PDFGenerator } from '@/lib/utils/pdf-generator';
 import { cn } from '@/lib/utils';
 import { InfiniteScroll } from '@/components/ui/infinite-scroll';
 import { exportToCSV } from '@/lib/utils/export';
+import { TenantFormDialog } from '@/components/tenant/tenant-form-dialog';
+import { PageLayout, PageHeader, PageToolbar, PageContent } from '@/components/layout/page-layout';
 
 type PaymentWithJoins = RentPayment & {
   tenant?: { name: string; phone: string } | null;
@@ -248,6 +250,18 @@ export function PaymentsClient({
 
   const activeTenant = tenants.find(t => t.id === selectedTenant);
 
+  const handleTenantCreated = (tenant: any) => {
+    // Add to tenants and select
+    setTenants(prev => [...prev, {
+      id: tenant.id,
+      name: tenant.name,
+      property_id: tenant.property_id,
+      rent_amount: tenant.rent_amount,
+      property: { title: 'New Tenant (Reload Required)' }
+    }]);
+    setSelectedTenant(tenant.id);
+  };
+
   async function handleRecord(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!selectedTenant || !activeTenant) return;
@@ -287,112 +301,120 @@ export function PaymentsClient({
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Financial Management</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Track rent collections and owner settlements
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button 
-            onClick={handleRunAutomation}
-            disabled={runningAutomation}
-            variant="outline"
-            className="border-primary/20 hover:bg-primary/5 text-primary"
-          >
-            {runningAutomation ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Clock className="h-4 w-4 mr-2" />
-            )}
-            Scan & Remind
-          </Button>
+    <PageLayout>
+      <PageHeader 
+        title="Financial Management"
+        description="Track rent collections and owner settlements"
+      >
+        <Button 
+          onClick={handleRunAutomation}
+          disabled={runningAutomation}
+          variant="outline"
+          className="border-primary/20 hover:bg-primary/5 text-primary w-full sm:w-auto"
+        >
+          {runningAutomation ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Clock className="h-4 w-4 mr-2" />
+          )}
+          Scan & Remind
+        </Button>
 
-          <Button 
-            onClick={handleExportCSV}
-            variant="outline"
-            className="border-primary/20 hover:bg-primary/5 text-primary"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
+        <Button 
+          onClick={handleExportCSV}
+          variant="outline"
+          className="border-primary/20 hover:bg-primary/5 text-primary w-full sm:w-auto"
+        >
+          <Download className="h-4 w-4 mr-2" />
+          Export CSV
+        </Button>
 
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger render={<Button className="bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white" />}>
-              <Plus className="h-4 w-4 mr-2" />
-              Record Payment
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Record Rent Payment</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleRecord} className="space-y-4 pt-2">
-                <div className="space-y-2">
-                  <Label>Tenant *</Label>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger render={<Button className="w-full sm:w-auto bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white" />}>
+            <Plus className="h-4 w-4 mr-2" />
+            Record Rent Payment
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Record Rent Payment</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleRecord} className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label>Tenant *</Label>
+                <div className="flex gap-2">
                   <Select value={selectedTenant} onValueChange={(val) => setSelectedTenant(val ?? '')}>
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select tenant" />
+                      <SelectValue placeholder="Select tenant">
+                        {(value) => {
+                          if (!value) return null;
+                          const t = tenants.find(x => x.id === value);
+                          if (!t) return null;
+                          const propTitle = (t.property as any)?.title || 'No Property';
+                          return `${t.name} (${propTitle})`;
+                        }}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {tenants.map(t => (
-                        <SelectItem key={t.id} value={t.id}>
-                          {t.name} ({(t.property as any)?.title || 'No Property'})
+                      {tenants.map(t => {
+                      const propTitle = (t.property as any)?.title || 'No Property';
+                      return (
+                        <SelectItem key={t.id} value={t.id} label={`${t.name} (${propTitle})`}>
+                          {`${t.name} (${propTitle})`}
                         </SelectItem>
+                      );
+                    })}
+                    </SelectContent>
+                  </Select>
+                  <TenantFormDialog onSuccess={handleTenantCreated} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Amount (₹) *</Label>
+                  <Input key={`amount-${activeTenant?.id || 'empty'}`} name="amount" type="number" required defaultValue={activeTenant?.rent_amount || ''} />
+                </div>
+                <div className="space-y-2">
+                  <Label>For Month *</Label>
+                  <Input name="month_year" required placeholder="May 2026" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Payment Date *</Label>
+                  <Input name="payment_date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Mode</Label>
+                  <Select value={paymentMode} onValueChange={(val) => setPaymentMode(val ?? 'upi')}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(modeLabels).map(([k, v]) => (
+                        <SelectItem key={k} value={k}>{v}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Amount (₹) *</Label>
-                    <Input name="amount" type="number" required defaultValue={activeTenant?.rent_amount || ''} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>For Month *</Label>
-                    <Input name="month_year" required placeholder="May 2026" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Payment Date *</Label>
-                    <Input name="payment_date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Mode</Label>
-                    <Select value={paymentMode} onValueChange={(val) => setPaymentMode(val ?? 'upi')}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(modeLabels).map(([k, v]) => (
-                          <SelectItem key={k} value={k}>{v}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Notes</Label>
-                  <Input name="notes" placeholder="Optional notes" />
-                </div>
-                <div className="flex justify-end gap-3 pt-2">
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                  <Button type="submit" disabled={saving}>
-                    {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                    Record
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Notes</Label>
+                <Input name="notes" placeholder="Optional notes" />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={saving}>
+                  {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  Record
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </PageHeader>
 
-      {/* Global Toolbar for Search & Status Filter */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <PageToolbar>
+        <div className="relative flex-1 w-full sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search financial records..."
@@ -403,7 +425,7 @@ export function PaymentsClient({
         </div>
         {activeTab === 'payouts' && (
           <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? 'all')}>
-            <SelectTrigger className="w-[160px] bg-card">
+            <SelectTrigger className="w-full sm:w-[160px] bg-card">
               <SelectValue placeholder="All Payout Status" />
             </SelectTrigger>
             <SelectContent>
@@ -413,13 +435,14 @@ export function PaymentsClient({
             </SelectContent>
           </Select>
         )}
-      </div>
+      </PageToolbar>
 
+      <PageContent>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="bg-card border border-border/50 p-1">
-          <TabsTrigger value="collections" className="px-6">Rent Collections</TabsTrigger>
-          <TabsTrigger value="payouts" className="px-6">Owner Payouts</TabsTrigger>
-          <TabsTrigger value="schedules" className="px-6">Rent Schedules</TabsTrigger>
+        <TabsList className="bg-card border border-border/50 p-1 flex w-full overflow-x-auto sm:w-auto h-auto">
+          <TabsTrigger value="collections" className="px-6 py-2 flex-1 sm:flex-none whitespace-nowrap">Rent Collections</TabsTrigger>
+          <TabsTrigger value="payouts" className="px-6 py-2 flex-1 sm:flex-none whitespace-nowrap">Owner Payouts</TabsTrigger>
+          <TabsTrigger value="schedules" className="px-6 py-2 flex-1 sm:flex-none whitespace-nowrap">Rent Schedules</TabsTrigger>
         </TabsList>
 
         <TabsContent value="collections" className="space-y-6 outline-none">
@@ -829,6 +852,7 @@ export function PaymentsClient({
           )}
         </TabsContent>
       </Tabs>
-    </div>
+      </PageContent>
+    </PageLayout>
   );
 }

@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { DOCUMENT_TYPE_LABELS } from '@/types/database';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -12,6 +12,7 @@ import {
   ExternalLink, CheckCircle, AlertCircle,
 } from 'lucide-react';
 import { CopyButton } from '@/components/ui/copy-button';
+import { cn } from '@/lib/utils';
 
 export default async function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -36,10 +37,8 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/tenants">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
+        <Link href="/tenants" className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}>
+          <ArrowLeft className="h-4 w-4" />
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3">

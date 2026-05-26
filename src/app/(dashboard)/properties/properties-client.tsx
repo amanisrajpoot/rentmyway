@@ -6,7 +6,7 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import type { Property } from '@/types/database';
 import { PROPERTY_TYPE_LABELS, FURNISHING_LABELS } from '@/types/database';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -23,6 +23,7 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import { exportToCSV } from '@/lib/utils/export';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +35,7 @@ import { toast } from 'sonner';
 import { MediaDisplay } from '@/components/ui/media-display';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { InfiniteScroll } from '@/components/ui/infinite-scroll';
+import { PageLayout, PageHeader, PageToolbar, PageContent } from '@/components/layout/page-layout';
 
 const statusColors: Record<string, string> = {
   draft: 'bg-muted text-muted-foreground',
@@ -164,37 +166,31 @@ export function PropertiesClient({ initialProperties, userRole, initialFilters }
   };
 
   return (
-    <div className="space-y-6 sm:space-y-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Properties</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Manage your real estate listings
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button 
-            onClick={handleExportCSV}
-            variant="outline"
-            className="border-primary/20 hover:bg-primary/5 text-primary"
+    <PageLayout>
+      <PageHeader 
+        title="Properties" 
+        description="Manage your real estate listings"
+      >
+        <Button 
+          onClick={handleExportCSV}
+          variant="outline"
+          className="border-primary/20 hover:bg-primary/5 text-primary w-full sm:w-auto"
+        >
+          <Download className="h-4 w-4 mr-2" />
+          Export CSV
+        </Button>
+        {userRole === 'broker' && (
+          <Link 
+            href="/properties/new" 
+            className={cn(buttonVariants({ size: 'default' }), "w-full sm:w-auto bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white shadow-lg shadow-primary/20")}
           >
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
-          {userRole === 'broker' && (
-            <Link href="/properties/new">
-              <Button className="bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white shadow-lg shadow-primary/20">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Property
-              </Button>
-            </Link>
-          )}
-        </div>
-      </div>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Property
+          </Link>
+        )}
+      </PageHeader>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <PageToolbar>
         <div className="relative flex-1 sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
@@ -251,9 +247,9 @@ export function PropertiesClient({ initialProperties, userRole, initialFilters }
             </div>
           </div>
         </div>
-      </div>
+      </PageToolbar>
 
-      {/* Property grid */}
+      <PageContent>
       {properties.length === 0 ? (
         <Card className="border-border/50 border-dashed">
           <CardContent className="py-16 sm:py-20 text-center">
@@ -265,11 +261,12 @@ export function PropertiesClient({ initialProperties, userRole, initialFilters }
               Try adjusting your filters to find what you're looking for.
             </p>
             {userRole === 'broker' && (
-              <Link href="/properties/new" className="inline-block mt-4">
-                <Button variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Property
-                </Button>
+              <Link 
+                href="/properties/new" 
+                className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), "inline-flex mt-4")}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Property
               </Link>
             )}
           </CardContent>
@@ -404,6 +401,8 @@ export function PropertiesClient({ initialProperties, userRole, initialFilters }
           />
         </div>
       )}
-    </div>
+      </PageContent>
+    </PageLayout>
   );
 }
+

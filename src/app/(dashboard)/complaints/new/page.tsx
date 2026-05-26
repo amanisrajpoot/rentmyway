@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createComplaint } from '@/lib/actions/complaints';
 import { getUserProfile } from '@/lib/actions/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,6 +16,9 @@ import { createClient } from '@/lib/supabase/client';
 import { MediaUploader } from '@/components/ui/media-uploader';
 import { COMPLAINT_CATEGORY_LABELS } from '@/types/database';
 import { VoiceAssistant } from '@/components/ui/voice-assistant';
+import { Plus } from 'lucide-react';
+import Link from 'next/link';
+import { TenantFormDialog } from '@/components/tenant/tenant-form-dialog';
 
 export default function NewComplaintPage() {
   const router = useRouter();
@@ -110,6 +113,11 @@ export default function NewComplaintPage() {
     loadTenants();
   }, [selectedProperty, userRole]);
 
+  const handleTenantCreated = (tenant: any) => {
+    setTenants(prev => [...prev, { id: tenant.id, name: tenant.name }]);
+    setSelectedTenant(tenant.id);
+  };
+
   const handleVoiceData = (data: any) => {
     if (data.title) {
       const el = document.querySelector('input[name="title"]') as HTMLInputElement;
@@ -200,30 +208,44 @@ export default function NewComplaintPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Property *</Label>
-                  <Select value={selectedProperty} onValueChange={(val) => setSelectedProperty(val ?? '')}>
-                    <SelectTrigger className="bg-background/50 w-full">
-                      <SelectValue placeholder="Select property" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {properties.map(p => (
-                        <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <Select value={selectedProperty} onValueChange={(val) => setSelectedProperty(val ?? '')}>
+                      <SelectTrigger className="bg-background/50 w-full">
+                        <SelectValue placeholder="Select property">
+                          {(value) => {
+                            if (!value) return null;
+                            const prop = properties.find(p => p.id === value);
+                            return prop ? prop.title : null;
+                          }}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {properties.map(p => (
+                          <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Link href="/properties/new" className={buttonVariants({ variant: 'outline', size: 'icon' })} title="Add Property">
+                      <Plus className="h-4 w-4" />
+                    </Link>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label>Tenant *</Label>
-                  <Select value={selectedTenant} onValueChange={(val) => setSelectedTenant(val ?? '')}>
-                    <SelectTrigger className="bg-background/50 w-full">
-                      <SelectValue placeholder={tenants.length ? 'Select tenant' : 'Select property first'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {tenants.map(t => (
-                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <Select value={selectedTenant} onValueChange={(val) => setSelectedTenant(val ?? '')}>
+                      <SelectTrigger className="bg-background/50 w-full">
+                        <SelectValue placeholder={tenants.length ? 'Select tenant' : 'Select property first'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tenants.map(t => (
+                          <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <TenantFormDialog onSuccess={handleTenantCreated} defaultPropertyId={selectedProperty} />
+                  </div>
                 </div>
               </div>
             )}

@@ -17,6 +17,8 @@ import { PhoneLink } from '@/components/ui/phone-link';
 import { getTenants } from '@/lib/actions/tenants';
 import { InfiniteScroll } from '@/components/ui/infinite-scroll';
 import { toast } from 'sonner';
+import { PageLayout, PageHeader, PageToolbar, PageContent } from '@/components/layout/page-layout';
+import { TenantFormDialog } from '@/components/tenant/tenant-form-dialog';
 
 type TenantWithProperty = Tenant & { property?: { id: string; title: string; locality: string; city: string } };
 
@@ -92,49 +94,50 @@ export function TenantsClient({ initialTenants, initialFilters }: TenantsClientP
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Tenants</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Manage your tenants
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant={showActive ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setShowActive(true)}
-          >
-            Active
-          </Button>
-          <Button
-            variant={!showActive ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setShowActive(false)}
-          >
-            Past
-          </Button>
-        </div>
-      </div>
+    <PageLayout>
+      <PageHeader 
+        title="Tenants"
+        description="Manage your tenants"
+      >
+        <Button
+          variant={showActive ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setShowActive(true)}
+          className="flex-1 sm:flex-none"
+        >
+          Active
+        </Button>
+        <Button
+          variant={!showActive ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setShowActive(false)}
+          className="flex-1 sm:flex-none"
+        >
+          Past
+        </Button>
+        <TenantFormDialog onSuccess={() => window.location.reload()} />
+      </PageHeader>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search tenants by name or phone..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-10 bg-card"
-        />
-      </div>
+      <PageToolbar>
+        <div className="relative w-full sm:max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search tenants by name or phone..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 bg-card"
+          />
+        </div>
+      </PageToolbar>
 
+      <PageContent>
       {tenants.length === 0 ? (
         <Card className="border-border/50">
           <CardContent className="py-16 text-center">
             <UserCheck className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
             <h3 className="font-semibold text-lg">No tenants found</h3>
             <p className="text-muted-foreground text-sm mt-1">
-              Tenants are created when a lead is converted.
+              Add a new tenant manually or by converting a lead.
             </p>
           </CardContent>
         </Card>
@@ -207,6 +210,7 @@ export function TenantsClient({ initialTenants, initialFilters }: TenantsClientP
           />
         </div>
       )}
-    </div>
+      </PageContent>
+    </PageLayout>
   );
 }

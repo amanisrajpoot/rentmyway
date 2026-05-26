@@ -48,6 +48,7 @@ type BillWithJoins = UtilityBill & {
 
 import { InfiniteScroll } from '@/components/ui/infinite-scroll';
 import { Search } from 'lucide-react';
+import { PageLayout, PageHeader, PageToolbar, PageContent } from '@/components/layout/page-layout';
 
 export function UtilityBillsClient({ 
   initialBills,
@@ -191,16 +192,13 @@ export function UtilityBillsClient({
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Utility Bills</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Track utility expenses across properties
-          </p>
-        </div>
+    <PageLayout>
+      <PageHeader 
+        title="Utility Bills"
+        description="Track utility expenses across properties"
+      >
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger render={<Button className="bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white" />}>
+          <DialogTrigger render={<Button className="w-full sm:w-auto bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white" />}>
             <Plus className="h-4 w-4 mr-2" />
             Add Bill
           </DialogTrigger>
@@ -214,7 +212,13 @@ export function UtilityBillsClient({
                   <Label>Property *</Label>
                   <Select value={selectedProperty} onValueChange={(val) => setSelectedProperty(val ?? '')}>
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select property" />
+                      <SelectValue placeholder="Select property">
+                        {(value) => {
+                          if (!value) return null;
+                          const prop = properties.find(p => p.id === value);
+                          return prop ? prop.title : null;
+                        }}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {properties.map(p => (
@@ -271,10 +275,11 @@ export function UtilityBillsClient({
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+      </PageHeader>
 
+      <PageContent>
       {/* Summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
         <Card className="border-border/50 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] opacity-[0.06]" />
           <CardContent className="pt-5 flex items-center gap-4">
@@ -300,10 +305,10 @@ export function UtilityBillsClient({
           </CardContent>
         </Card>
       </div>
+      </PageContent>
 
-      {/* Global Toolbar with Search & Dropdowns */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <PageToolbar>
+        <div className="relative flex-1 w-full sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search bills by property, tenant, or month..."
@@ -313,7 +318,7 @@ export function UtilityBillsClient({
           />
         </div>
         <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v ?? 'all')}>
-          <SelectTrigger className="w-[150px] bg-card">
+          <SelectTrigger className="w-full sm:w-[150px] bg-card">
             <SelectValue placeholder="All Types" />
           </SelectTrigger>
           <SelectContent>
@@ -324,7 +329,7 @@ export function UtilityBillsClient({
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? 'all')}>
-          <SelectTrigger className="w-[130px] bg-card">
+          <SelectTrigger className="w-full sm:w-[130px] bg-card">
             <SelectValue placeholder="All Status" />
           </SelectTrigger>
           <SelectContent>
@@ -334,9 +339,9 @@ export function UtilityBillsClient({
             <SelectItem value="overdue">Overdue</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </PageToolbar>
 
-      {/* Table */}
+      <PageContent>
       {bills.length === 0 ? (
         <Card className="border-border/50 border-dashed">
           <CardContent className="py-16 text-center">
@@ -417,6 +422,7 @@ export function UtilityBillsClient({
           />
         </div>
       )}
-    </div>
+      </PageContent>
+    </PageLayout>
   );
 }
