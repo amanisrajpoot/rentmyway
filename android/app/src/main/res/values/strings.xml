@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">RentMyWay</string>
+    <string name="title_activity_main">RentMyWay</string>
+    <string name="package_name">com.rentmyway.app</string>
+    <string name="custom_url_scheme">com.rentmyway.app</string>
+</resources>

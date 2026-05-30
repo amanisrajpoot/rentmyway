@@ -27,7 +27,7 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
-  const kycUrl = tenant.kyc_token ? `${baseUrl}/kyc/${tenant.kyc_token}` : null;
+  const kycUrl = tenant.kyc_token ? `${baseUrl}/kyc?token=${tenant.kyc_token}` : null;
 
   const documents = tenant.documents || [];
   const requiredDocs = ['aadhaar', 'pan'] as const;

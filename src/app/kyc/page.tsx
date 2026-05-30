@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { DOCUMENT_TYPE_LABELS } from '@/types/database';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,8 +19,16 @@ interface TenantInfo {
 }
 
 export default function KYCUploadPage() {
-  const params = useParams();
-  const token = params.token as string;
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+      <KYCUploadContent />
+    </Suspense>
+  );
+}
+
+function KYCUploadContent() {
+  const searchParams = useSearchParams();
+  const token = searchParams.get('token') as string;
   const [tenant, setTenant] = useState<TenantInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
