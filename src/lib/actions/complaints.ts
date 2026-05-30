@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { getUserProfile } from '@/lib/actions/auth';
+import { logActivity } from './activity-log';
 import { revalidatePath } from 'next/cache';
 import type { ComplaintInsert, ComplaintStatus } from '@/types/database';
 
@@ -96,8 +97,8 @@ export async function getComplaints(filters?: {
   query = query.range(from, to);
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return data || [];
+  if (error) return { error: error.message };
+  return { data: data || [] };
 }
 
 export async function createComplaint(data: ComplaintInsert) {
@@ -105,13 +106,23 @@ export async function createComplaint(data: ComplaintInsert) {
   const profile = await getUserProfile();
   if (!profile) throw new Error('Not authenticated');
 
-  const { error } = await supabase.from('complaints').insert({
+  const { data: complaint, error } = await supabase.from('complaints').insert({
     ...data,
     broker_id: data.broker_id || profile.id,
+  }).select().single();
+
+  if (error) return { error: error.message };
+
+  await logActivity({
+    user_id: profile.id,
+    action: 'Logged Complaint',
+    entity_type: 'complaint',
+    entity_id: complaint.id,
+    details: { title: data.title, category: data.category, property_id: data.property_id },
   });
 
-  if (error) throw new Error(error.message);
   revalidatePath('/complaints');
+  return { success: true, data: complaint };
 }
 
 export async function updateComplaint(id: string, data: any) {
@@ -125,8 +136,9 @@ export async function updateComplaint(id: string, data: any) {
     })
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath('/complaints');
+  return { success: true };
 }
 
 export async function resolveComplaint(id: string, notes: string, cost: number, images?: string[]) {
@@ -144,8 +156,9 @@ export async function resolveComplaint(id: string, notes: string, cost: number, 
     })
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath('/complaints');
+  return { success: true };
 }
 
 export async function rateComplaint(id: string, rating: number, feedback: string) {
@@ -160,7 +173,8 @@ export async function rateComplaint(id: string, rating: number, feedback: string
     })
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath('/complaints');
+  return { success: true };
 }
 

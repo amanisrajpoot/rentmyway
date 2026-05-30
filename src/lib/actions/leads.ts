@@ -15,7 +15,7 @@ export async function getLeads(filters?: {
 }) {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) return [];
+  if (!profile) return { error: 'Not authenticated' };
 
   let query = supabase
     .from('leads')
@@ -40,8 +40,8 @@ export async function getLeads(filters?: {
   query = query.range(from, to);
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return data || [];
+  if (error) return { error: error.message };
+  return { data: data || [] };
 }
 
 export async function getLead(id: string) {
@@ -53,14 +53,14 @@ export async function getLead(id: string) {
     .eq('id', id)
     .single();
 
-  if (error) throw new Error(error.message);
-  return data;
+  if (error) return { error: error.message };
+  return { data };
 }
 
 export async function createLead(data: LeadInsert) {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) throw new Error('Not authenticated');
+  if (!profile) return { error: 'Not authenticated' };
 
   // Check for duplicate lead by phone number
   const { data: existingLead } = await supabase
@@ -71,18 +71,19 @@ export async function createLead(data: LeadInsert) {
     .maybeSingle();
 
   if (existingLead) {
-    throw new Error(
-      `A lead with phone ${data.phone} already exists: "${existingLead.name}" (${existingLead.status}). Please update the existing lead instead.`
-    );
+    return { error: `A lead with phone ${data.phone} already exists: "${existingLead.name}" (${existingLead.status}). Please update the existing lead instead.` };
   }
+
+  const leadInsertData: any = { ...data, broker_id: profile.id };
+  delete leadInsertData.images; // the column doesn't exist yet in the database
 
   const { data: lead, error } = await supabase
     .from('leads')
-    .insert({ ...data, broker_id: profile.id })
+    .insert(leadInsertData)
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   revalidatePath('/leads');
 
@@ -94,21 +95,26 @@ export async function createLead(data: LeadInsert) {
     details: { name: lead.name, phone: lead.phone },
   });
 
-  return lead;
+  return { data: lead };
 }
 
 export async function updateLead(id: string, data: LeadUpdate) {
   const supabase = await createClient();
 
+  const leadUpdateData: any = { ...data, updated_at: new Date().toISOString() };
+  delete leadUpdateData.images; // the column doesn't exist yet in the database
+
   const { error } = await supabase
     .from('leads')
-    .update({ ...data, updated_at: new Date().toISOString() })
+    .update(leadUpdateData)
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   revalidatePath('/leads');
   revalidatePath(`/leads/${id}`);
+  
+  return { success: true };
 }
 
 export async function updateLeadStage(id: string, status: LeadStatus) {
@@ -119,15 +125,17 @@ export async function updateLeadStage(id: string, status: LeadStatus) {
     .update({ status, updated_at: new Date().toISOString() })
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   revalidatePath('/leads');
+  
+  return { success: true };
 }
 
 export async function convertLead(leadId: string, propertyId: string) {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) throw new Error('Not authenticated');
+  if (!profile) return { error: 'Not authenticated' };
 
   // Get lead data
   const { data: lead, error: leadError } = await supabase
@@ -136,7 +144,7 @@ export async function convertLead(leadId: string, propertyId: string) {
     .eq('id', leadId)
     .single();
 
-  if (leadError || !lead) throw new Error('Lead not found');
+  if (leadError || !lead) return { error: 'Lead not found' };
 
   // Get property data
   const { data: property, error: propError } = await supabase
@@ -145,7 +153,7 @@ export async function convertLead(leadId: string, propertyId: string) {
     .eq('id', propertyId)
     .single();
 
-  if (propError || !property) throw new Error('Property not found');
+  if (propError || !property) return { error: 'Property not found' };
 
   // Generate KYC token
   const kycToken = crypto.randomBytes(32).toString('hex');
@@ -167,7 +175,7 @@ export async function convertLead(leadId: string, propertyId: string) {
     kyc_token_expiry: kycTokenExpiry,
   });
 
-  if (tenantError) throw new Error(tenantError.message);
+  if (tenantError) return { error: tenantError.message };
 
   // Update lead status to converted
   await supabase
@@ -193,7 +201,7 @@ export async function convertLead(leadId: string, propertyId: string) {
     details: { name: lead.name, property: property.title },
   });
 
-  return { kycToken };
+  return { data: { kycToken } };
 }
 
 export async function addFollowUp(data: {
@@ -204,7 +212,7 @@ export async function addFollowUp(data: {
 }) {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) throw new Error('Not authenticated');
+  if (!profile) return { error: 'Not authenticated' };
 
   const { error } = await supabase.from('lead_follow_ups').insert({
     ...data,
@@ -212,9 +220,11 @@ export async function addFollowUp(data: {
     follow_up_date: data.follow_up_date || null,
   });
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   revalidatePath(`/leads/${data.lead_id}`);
+  
+  return { success: true };
 }
 
 export async function getFollowUps(leadId: string) {
@@ -226,23 +236,25 @@ export async function getFollowUps(leadId: string) {
     .eq('lead_id', leadId)
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
-  return data || [];
+  if (error) return { error: error.message };
+  return { data: data || [] };
 }
 
 export async function deleteLead(id: string) {
   const supabase = await createClient();
 
   const { error } = await supabase.from('leads').delete().eq('id', id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   revalidatePath('/leads');
+  
+  return { success: true };
 }
 
 export async function getBrokerSiteVisits() {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) return [];
+  if (!profile) return { data: [] };
 
   const { data, error } = await supabase
     .from('lead_follow_ups')
@@ -251,7 +263,8 @@ export async function getBrokerSiteVisits() {
     .eq('type', 'site_visit')
     .order('follow_up_date', { ascending: true });
 
-  if (error) throw new Error(error.message);
-  return data || [];
+  if (error) return { error: error.message };
+  return { data: data || [] };
 }
+
 

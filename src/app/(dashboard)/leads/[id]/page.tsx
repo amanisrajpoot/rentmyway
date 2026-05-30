@@ -25,12 +25,23 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   let matchedProperties;
 
   try {
-    [lead, followUps] = await Promise.all([
+    const [leadRes, followUpsRes] = await Promise.all([
       getLead(id),
       getFollowUps(id),
     ]);
-    if (lead) {
-      matchedProperties = await getMatchedProperties(lead);
+    if ('data' in leadRes && leadRes.data) {
+      lead = leadRes.data;
+      const matchedRes = await getMatchedProperties(lead);
+      if (matchedRes && 'data' in matchedRes && matchedRes.data) {
+        matchedProperties = matchedRes.data;
+      } else {
+        matchedProperties = [];
+      }
+    }
+    if ('data' in followUpsRes && followUpsRes.data) {
+      followUps = followUpsRes.data;
+    } else {
+      followUps = [];
     }
   } catch {
     notFound();

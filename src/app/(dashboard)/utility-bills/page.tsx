@@ -15,7 +15,7 @@ export default async function UtilityBillsPage({
   const billType = resolvedParams.type ?? 'all';
   const status = resolvedParams.status ?? 'all';
 
-  const [bills, stats] = await Promise.all([
+  const [billsRes, statsRes] = await Promise.all([
     getUtilityBills({
       search,
       billType,
@@ -25,6 +25,9 @@ export default async function UtilityBillsPage({
     }),
     getUtilityBillStats(),
   ]);
+
+  const bills = 'data' in billsRes && billsRes.data ? billsRes.data : [];
+  const stats = 'data' in statsRes && statsRes.data ? statsRes.data : { totalAmount: 0, pendingAmount: 0 };
 
   return (
     <UtilityBillsClient

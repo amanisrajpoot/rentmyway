@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { logActivity } from './activity-log';
 import type { BrokerCommission, BrokerCommissionInsert, BrokerCommissionUpdate } from '@/types/database';
 
 export async function getCommissions() {
@@ -20,8 +21,8 @@ export async function getCommissions() {
     .eq('broker_id', user.id)
     .order('deal_date', { ascending: false });
 
-  if (error) throw new Error(error.message);
-  return data as any[];
+  if (error) return { error: error.message };
+  return { data: data as any[] };
 }
 
 export async function createCommission(data: BrokerCommissionInsert) {
@@ -35,9 +36,18 @@ export async function createCommission(data: BrokerCommissionInsert) {
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
+
+  await logActivity({
+    user_id: user.id,
+    action: 'Logged Commission',
+    entity_type: 'commission',
+    entity_id: commission.id,
+    details: { type: data.commission_type, amount: data.computed_amount, property_id: data.property_id },
+  });
+
   revalidatePath('/commissions');
-  return commission;
+  return { success: true, data: commission };
 }
 
 export async function updateCommission(id: string, data: BrokerCommissionUpdate) {
@@ -47,7 +57,19 @@ export async function updateCommission(id: string, data: BrokerCommissionUpdate)
     .update(data)
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    await logActivity({
+      user_id: user.id,
+      action: 'Updated Commission',
+      entity_type: 'commission',
+      entity_id: id,
+      details: { ...data },
+    });
+  }
+
   revalidatePath('/commissions');
   return { success: true };
 }
@@ -59,7 +81,19 @@ export async function deleteCommission(id: string) {
     .delete()
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    await logActivity({
+      user_id: user.id,
+      action: 'Deleted Commission',
+      entity_type: 'commission',
+      entity_id: id,
+      details: { deleted: true },
+    });
+  }
+
   revalidatePath('/commissions');
   return { success: true };
 }
@@ -85,5 +119,5 @@ export async function getCommissionStats() {
     return acc;
   }, { total: 0, received: 0, pending: 0 });
 
-  return stats;
+  return { data: stats };
 }

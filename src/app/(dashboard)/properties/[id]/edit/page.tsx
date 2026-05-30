@@ -6,14 +6,18 @@ export default async function EditPropertyPage({ params }: { params: Promise<{ i
   const { id } = await params;
   let property;
   try {
-    property = await getProperty(id);
+    const propertyRes = await getProperty(id);
+    if ('data' in propertyRes && propertyRes.data) {
+      property = propertyRes.data;
+    }
   } catch {
     notFound();
   }
 
   if (!property) notFound();
 
-  const owners = await getOwners();
+  const ownersRes = await getOwners();
+  const owners = 'data' in ownersRes && ownersRes.data ? ownersRes.data : [];
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">

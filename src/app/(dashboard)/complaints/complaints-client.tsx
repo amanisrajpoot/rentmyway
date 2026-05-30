@@ -90,12 +90,19 @@ export function ComplaintsClient({
     setLoading(true);
     try {
       const nextPage = page + 1;
-      const nextComplaints = await getComplaints({
+      const nextComplaintsRes = await getComplaints({
         search,
         status: statusFilter,
         page: nextPage,
         limit: 12,
       });
+
+      if ('error' in nextComplaintsRes && nextComplaintsRes.error) {
+        toast.error(nextComplaintsRes.error);
+        return;
+      }
+      
+      const nextComplaints = 'data' in nextComplaintsRes && nextComplaintsRes.data ? nextComplaintsRes.data : [];
 
       if (nextComplaints.length < 12) {
         setHasMore(false);
@@ -111,11 +118,12 @@ export function ComplaintsClient({
 
   async function handleStatusUpdate(id: string, newStatus: string) {
     try {
-      await updateComplaint(id, { status: newStatus });
+      const res = await updateComplaint(id, { status: newStatus });
+      if (res && 'error' in res && res.error) throw new Error(res.error);
       toast.success(`Status updated to ${COMPLAINT_STATUS_LABELS[newStatus as keyof typeof COMPLAINT_STATUS_LABELS]}`);
       router.refresh();
-    } catch {
-      toast.error('Failed to update');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update');
     }
   }
 

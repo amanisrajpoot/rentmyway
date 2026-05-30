@@ -26,7 +26,8 @@ const actionColors: Record<string, string> = {
 };
 
 export async function ActivityFeed() {
-  const activities = await getActivityLog();
+  const res = await getActivityLog();
+  const activities = 'data' in res && res.data ? res.data : [];
 
   if (activities.length === 0) {
     return (

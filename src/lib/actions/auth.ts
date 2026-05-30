@@ -95,14 +95,14 @@ export async function getUserProfile() {
 export async function updateProfile(data: { full_name: string; phone: string; avatar_url?: string | null }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+  if (!user) return { error: 'Not authenticated' };
 
   const { error } = await supabase
     .from('profiles')
     .update(data)
     .eq('id', user.id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   // Update auth metadata
   await supabase.auth.updateUser({
@@ -112,4 +112,6 @@ export async function updateProfile(data: { full_name: string; phone: string; av
       avatar_url: data.avatar_url,
     }
   });
+
+  return { success: true };
 }

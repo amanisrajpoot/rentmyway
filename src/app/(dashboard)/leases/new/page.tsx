@@ -78,7 +78,7 @@ export default function NewLeasePage() {
       const endDate = fd.get('end_date') as string;
       const monthlyRent = parseFloat(fd.get('monthly_rent') as string);
 
-      const lease = await createLease({
+      const leaseRes = await createLease({
         tenant_id: selectedTenant,
         property_id: activeTenant.property_id,
         broker_id: '', // Will be set by server action
@@ -99,9 +99,15 @@ export default function NewLeasePage() {
         termination_reason: null,
       });
 
+      if (leaseRes && 'error' in leaseRes && leaseRes.error) {
+        throw new Error(leaseRes.error);
+      }
+
+      const lease = leaseRes.data;
+
       // Generate rent schedule
-      if (lease?.id) {
-        await generateRentSchedule(
+      if (lease && 'id' in lease && lease.id) {
+        const scheduleRes = await generateRentSchedule(
           selectedTenant,
           activeTenant.property_id,
           lease.id,
@@ -109,6 +115,10 @@ export default function NewLeasePage() {
           startDate,
           endDate
         );
+        
+        if ('error' in scheduleRes && scheduleRes.error) {
+          throw new Error(scheduleRes.error);
+        }
       }
 
       toast.success('Lease created with rent schedule');

@@ -111,7 +111,7 @@ export function PropertiesClient({ initialProperties, userRole, initialFilters }
     setIsLoading(true);
     try {
       const nextPage = page + 1;
-      const nextProperties = await getProperties({
+      const nextPropertiesRes = await getProperties({
         status: statusFilter,
         type: typeFilter,
         search: search,
@@ -121,13 +121,20 @@ export function PropertiesClient({ initialProperties, userRole, initialFilters }
         limit: 12,
       });
 
+      if ('error' in nextPropertiesRes && nextPropertiesRes.error) {
+        toast.error(nextPropertiesRes.error);
+        return;
+      }
+
+      const nextProperties = 'data' in nextPropertiesRes && nextPropertiesRes.data ? nextPropertiesRes.data : [];
+
       if (nextProperties.length < 12) {
         setHasMore(false);
       }
       setProperties((prev) => [...prev, ...nextProperties]);
       setPage(nextPage);
     } catch {
-      toast.error('Failed to load more properties');
+      toast.error('Failed to load more properties due to an unexpected error');
     } finally {
       setIsLoading(false);
     }
@@ -136,16 +143,18 @@ export function PropertiesClient({ initialProperties, userRole, initialFilters }
   async function handleStatusChange(id: string, action: 'rent' | 'available') {
     try {
       if (action === 'rent') {
-        await markPropertyAsRented(id);
+        const res = await markPropertyAsRented(id);
+        if ('error' in res && res.error) throw new Error(res.error);
         toast.success('Property marked as rented');
       } else {
-        await markPropertyAsAvailable(id);
+        const res = await markPropertyAsAvailable(id);
+        if ('error' in res && res.error) throw new Error(res.error);
         toast.success('Property marked as available');
       }
       // Re-trigger server updates
       router.refresh();
-    } catch {
-      toast.error('Failed to update property status');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update property status');
     }
   }
 
@@ -351,11 +360,12 @@ export function PropertiesClient({ initialProperties, userRole, initialFilters }
                               confirmLabel="Delete Property"
                               onConfirm={async () => {
                                 try {
-                                  await deleteProperty(property.id);
+                                  const res = await deleteProperty(property.id);
+                                  if ('error' in res && res.error) throw new Error(res.error);
                                   toast.success('Property deleted');
                                   router.refresh();
-                                } catch {
-                                  toast.error('Failed to delete property');
+                                } catch (err: unknown) {
+                                  toast.error(err instanceof Error ? err.message : 'Failed to delete property');
                                 }
                               }}
                             />

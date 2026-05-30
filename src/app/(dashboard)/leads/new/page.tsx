@@ -72,7 +72,7 @@ export default function NewLeadPage() {
     const formData = new FormData(e.currentTarget);
 
     try {
-      await createLead({
+      const result = await createLead({
         name: formData.get('name') as string,
         phone: formData.get('phone') as string,
         email: (formData.get('email') as string) || null,
@@ -91,10 +91,15 @@ export default function NewLeadPage() {
         broker_id: '',
       });
 
+      if ('error' in result && result.error) {
+        toast.error(result.error);
+        return;
+      }
+
       toast.success('Lead created successfully');
       router.push('/leads');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create lead');
+      toast.error('Failed to create lead due to an unexpected error');
     } finally {
       setLoading(false);
     }

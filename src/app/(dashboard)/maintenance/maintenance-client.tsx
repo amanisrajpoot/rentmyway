@@ -68,7 +68,7 @@ export function MaintenanceClient({ initialSchedule }: { initialSchedule: Mainte
     const fd = new FormData(e.currentTarget);
 
     try {
-      await createMaintenanceSchedule({
+      const res = await createMaintenanceSchedule({
         property_id: selectedProperty,
         broker_id: '', // Set by action
         title: fd.get('title') as string,
@@ -83,11 +83,12 @@ export function MaintenanceClient({ initialSchedule }: { initialSchedule: Mainte
         last_completed: null,
         custom_days: fd.get('custom_days') ? parseInt(fd.get('custom_days') as string) : null,
       });
+      if (res && 'error' in res && res.error) throw new Error(res.error);
       toast.success('Maintenance task scheduled');
       setDialogOpen(false);
       router.refresh();
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error(err.message || 'Failed to schedule');
     } finally {
       setSaving(false);
     }
@@ -106,11 +107,12 @@ export function MaintenanceClient({ initialSchedule }: { initialSchedule: Mainte
     }
 
     try {
-      await completeMaintenanceTask(item.id, item.estimated_cost || 0, newDate.toISOString().split('T')[0]);
+      const res = await completeMaintenanceTask(item.id, item.estimated_cost || 0, newDate.toISOString().split('T')[0]);
+      if (res && 'error' in res && res.error) throw new Error(res.error);
       toast.success('Task marked as completed');
       router.refresh();
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error(err.message || 'Failed to complete task');
     }
   }
 

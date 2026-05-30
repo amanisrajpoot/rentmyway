@@ -37,12 +37,15 @@ export function SettingsClient({ initialProfile }: { initialProfile: Profile }) 
     const finalAvatar = avatarUrl.length > 0 ? avatarUrl[0] : null;
 
     try {
-      await updateProfile({ full_name: fullName, phone, avatar_url: finalAvatar });
+      const res = await updateProfile({ full_name: fullName, phone, avatar_url: finalAvatar });
+      if (res && 'error' in res && res.error) {
+        throw new Error(res.error);
+      }
       setProfile(prev => ({ ...prev, full_name: fullName, phone, avatar_url: finalAvatar }));
       toast.success('Profile updated successfully');
       setIsEditing(false);
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update profile');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update profile');
     } finally {
       setSaving(false);
     }

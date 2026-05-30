@@ -20,7 +20,8 @@ export default async function OwnerLeasesPage() {
   const profile = await getUserProfile();
   if (!profile || profile.role !== 'owner') redirect('/dashboard');
 
-  const leases = await getLeases();
+  const res = await getLeases();
+  const leases = 'data' in res && res.data ? res.data : [];
 
   return (
     <div className="space-y-6 sm:space-y-8 animate-fade-in">

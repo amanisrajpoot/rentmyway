@@ -34,11 +34,13 @@ export default async function TenantLeasePage() {
   const profile = await getUserProfile();
   if (!profile || profile.role !== 'tenant') redirect('/dashboard');
 
-  const leases = await getLeases();
+  const res = await getLeases();
+  const leases = 'data' in res && res.data ? res.data : [];
   const lease = leases.find((l: any) => ['active', 'expiring'].includes(l.status)) || leases[0];
 
   // Get rent schedule for this tenant
-  const schedule = await getRentSchedule();
+  const scheduleRes = await getRentSchedule();
+  const schedule = 'data' in scheduleRes && scheduleRes.data ? scheduleRes.data : [];
 
   if (!lease) {
     return (

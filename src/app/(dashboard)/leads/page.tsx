@@ -13,7 +13,7 @@ export default async function LeadsPage({
   const search = resolvedParams.search ?? '';
   const status = resolvedParams.status ?? 'all';
 
-  const [leads, siteVisits] = await Promise.all([
+  const [leadsRes, siteVisitsRes] = await Promise.all([
     getLeads({
       search,
       status,
@@ -22,6 +22,9 @@ export default async function LeadsPage({
     }),
     getBrokerSiteVisits()
   ]);
+
+  const leads = 'data' in leadsRes && leadsRes.data ? leadsRes.data : [];
+  const siteVisits = 'data' in siteVisitsRes && siteVisitsRes.data ? siteVisitsRes.data : [];
 
   return (
     <LeadsClient

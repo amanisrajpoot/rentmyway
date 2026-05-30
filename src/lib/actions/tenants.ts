@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { getUserProfile } from '@/lib/actions/auth';
+import { logActivity } from './activity-log';
 import { revalidatePath } from 'next/cache';
 import crypto from 'crypto';
 
@@ -13,7 +14,7 @@ export async function getTenants(filters?: {
 }) {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) return [];
+  if (!profile) return { data: [] };
 
   let query = supabase
     .from('tenants')
@@ -36,8 +37,8 @@ export async function getTenants(filters?: {
   query = query.range(from, to);
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return data || [];
+  if (error) return { error: error.message };
+  return { data: data || [] };
 }
 
 export async function getTenant(id: string) {
@@ -49,36 +50,43 @@ export async function getTenant(id: string) {
     .eq('id', id)
     .single();
 
-  if (error) throw new Error(error.message);
-  return data;
+  if (error) return { error: error.message };
+  return { data };
 }
 
 export async function deactivateTenant(tenantId: string) {
   const supabase = await createClient();
 
   // Get tenant to find property
-  const { data: tenant } = await supabase
+  const { data: tenant, error: fetchError } = await supabase
     .from('tenants')
     .select('property_id')
     .eq('id', tenantId)
     .single();
 
-  if (!tenant) throw new Error('Tenant not found');
+  if (fetchError) return { error: fetchError.message };
+  if (!tenant) return { error: 'Tenant not found' };
 
   // Deactivate tenant
-  await supabase
+  const { error: updateTenantError } = await supabase
     .from('tenants')
     .update({ is_active: false, updated_at: new Date().toISOString() })
     .eq('id', tenantId);
+    
+  if (updateTenantError) return { error: updateTenantError.message };
 
   // Mark property as available
-  await supabase
+  const { error: updatePropError } = await supabase
     .from('properties')
     .update({ status: 'available', updated_at: new Date().toISOString() })
     .eq('id', tenant.property_id);
+    
+  if (updatePropError) return { error: updatePropError.message };
 
   revalidatePath('/tenants');
   revalidatePath('/properties');
+  
+  return { success: true };
 }
 
 export async function regenerateKycLink(tenantId: string) {
@@ -86,13 +94,15 @@ export async function regenerateKycLink(tenantId: string) {
   const kycToken = crypto.randomBytes(32).toString('hex');
   const kycTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
-  await supabase
+  const { error } = await supabase
     .from('tenants')
     .update({ kyc_token: kycToken, kyc_token_expiry: kycTokenExpiry })
     .eq('id', tenantId);
 
+  if (error) return { error: error.message };
+
   revalidatePath(`/tenants/${tenantId}`);
-  return kycToken;
+  return { data: kycToken };
 }
 
 export async function createDirectTenant(data: {
@@ -106,7 +116,7 @@ export async function createDirectTenant(data: {
 }) {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) throw new Error('Not authenticated');
+  if (!profile) return { error: 'Not authenticated' };
 
   const kycToken = crypto.randomBytes(32).toString('hex');
   const kycTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
@@ -129,16 +139,26 @@ export async function createDirectTenant(data: {
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   // Mark property as rented
-  await supabase
+  const { error: propError } = await supabase
     .from('properties')
     .update({ status: 'rented', updated_at: new Date().toISOString() })
     .eq('id', data.property_id);
+    
+  if (propError) return { error: propError.message };
+
+  await logActivity({
+    user_id: profile.id,
+    action: 'Created Tenant',
+    entity_type: 'tenant',
+    entity_id: tenant.id,
+    details: { name: tenant.name, property_id: tenant.property_id },
+  });
 
   revalidatePath('/tenants');
   revalidatePath('/properties');
 
-  return tenant;
+  return { data: tenant };
 }

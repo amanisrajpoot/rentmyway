@@ -15,7 +15,7 @@ export default async function PaymentsPage({
   const search = resolvedParams.search ?? '';
   const status = resolvedParams.status ?? 'all';
 
-  const [payments, payouts, stats, schedules] = await Promise.all([
+  const [paymentsRes, payoutsRes, statsRes, schedulesRes] = await Promise.all([
     getPayments({
       search,
       page: 0,
@@ -30,6 +30,11 @@ export default async function PaymentsPage({
     getFinancialStats(),
     getRentSchedule(),
   ]);
+
+  const payments = 'data' in paymentsRes && paymentsRes.data ? paymentsRes.data : [];
+  const payouts = 'data' in payoutsRes && payoutsRes.data ? payoutsRes.data : [];
+  const stats = 'data' in statsRes && statsRes.data ? statsRes.data : { totalCollected: 0, totalPayouts: 0, pendingPayouts: 0, totalCollectionsCount: 0, totalPayoutsCount: 0 };
+  const schedules = 'data' in schedulesRes && schedulesRes.data ? schedulesRes.data : [];
 
   return (
     <PaymentsClient

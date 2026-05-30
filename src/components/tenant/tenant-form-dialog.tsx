@@ -71,7 +71,7 @@ export function TenantFormDialog({ onSuccess, trigger, defaultPropertyId }: Tena
     const fd = new FormData(e.currentTarget);
     
     try {
-      const tenant = await createDirectTenant({
+      const res = await createDirectTenant({
         name: fd.get('name') as string,
         phone: fd.get('phone') as string,
         email: (fd.get('email') as string) || undefined,
@@ -81,9 +81,13 @@ export function TenantFormDialog({ onSuccess, trigger, defaultPropertyId }: Tena
         move_in_date: fd.get('move_in_date') as string,
       });
       
+      if ('error' in res && res.error) {
+        throw new Error(res.error);
+      }
+      
       toast.success('Tenant created successfully');
       setOpen(false);
-      onSuccess?.(tenant);
+      onSuccess?.('data' in res ? res.data : undefined);
     } catch (err: any) {
       toast.error(err.message || 'Failed to create tenant');
     } finally {

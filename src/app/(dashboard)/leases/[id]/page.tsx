@@ -42,11 +42,15 @@ export default async function LeaseDetailPage({ params }: { params: Promise<{ id
   let schedule;
   let profile;
   try {
-    lease = await getLease(id);
-    [schedule, profile] = await Promise.all([
+    const leaseRes = await getLease(id);
+    lease = 'data' in leaseRes ? leaseRes.data : null;
+    if (!lease) throw new Error('Not found');
+    const [scheduleRes, profileRes] = await Promise.all([
       getRentSchedule({ tenantId: lease.tenant_id }),
       getUserProfile(),
     ]);
+    schedule = 'data' in scheduleRes && scheduleRes.data ? scheduleRes.data : [];
+    profile = profileRes;
   } catch {
     notFound();
   }

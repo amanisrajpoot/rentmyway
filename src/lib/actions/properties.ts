@@ -17,7 +17,7 @@ export async function getProperties(filters?: {
 }) {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) return [];
+  if (!profile) return { data: [] };
 
   let query = supabase
     .from('properties')
@@ -50,7 +50,7 @@ export async function getProperties(filters?: {
     if (brokerId) {
       query = query.eq('broker_id', brokerId).eq('status', 'available');
     } else {
-      return []; // No broker found for tenant
+      return { data: [] }; // No broker found for tenant
     }
   } else if (profile.role === 'owner') {
     // Owners see their own properties
@@ -87,8 +87,8 @@ export async function getProperties(filters?: {
   query = query.range(from, to);
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return data || [];
+  if (error) return { error: error.message };
+  return { data: data || [] };
 }
 
 export async function getProperty(id: string) {
@@ -100,14 +100,14 @@ export async function getProperty(id: string) {
     .eq('id', id)
     .single();
 
-  if (error) throw new Error(error.message);
-  return data;
+  if (error) return { error: error.message };
+  return { data };
 }
 
 export async function createProperty(data: PropertyInsert) {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) throw new Error('Not authenticated');
+  if (!profile) return { error: 'Not authenticated' };
 
   // Sanitize: convert empty-string UUID fields to null so Postgres doesn't error
   const sanitized = {
@@ -116,9 +116,9 @@ export async function createProperty(data: PropertyInsert) {
     owner_id: data.owner_id || null,
   };
 
-  if (!sanitized.owner_id) throw new Error('Please select an owner before saving.');
+  if (!sanitized.owner_id) return { error: 'Please select an owner before saving.' };
   if (!sanitized.images || sanitized.images.length === 0) {
-    throw new Error('At least one property image is mandatory for a listing.');
+    return { error: 'At least one property image is mandatory for a listing.' };
   }
 
   const { data: property, error } = await supabase
@@ -127,7 +127,7 @@ export async function createProperty(data: PropertyInsert) {
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   revalidatePath('/properties');
 
@@ -139,14 +139,14 @@ export async function createProperty(data: PropertyInsert) {
     details: { title: property.title },
   });
 
-  return property;
+  return { data: property };
 }
 
 export async function updateProperty(id: string, data: PropertyUpdate) {
   const supabase = await createClient();
 
   if (data.images !== undefined && (!data.images || data.images.length === 0)) {
-    throw new Error('At least one property image is mandatory for a listing.');
+    return { error: 'At least one property image is mandatory for a listing.' };
   }
 
   const updatePayload: Record<string, any> = { ...data, updated_at: new Date().toISOString() };
@@ -162,10 +162,12 @@ export async function updateProperty(id: string, data: PropertyUpdate) {
     .update(updatePayload)
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   revalidatePath('/properties');
   revalidatePath(`/properties/${id}`);
+  
+  return { success: true };
 }
 
 export async function markPropertyAsRented(propertyId: string) {
@@ -176,7 +178,7 @@ export async function markPropertyAsRented(propertyId: string) {
     .update({ status: 'rented', updated_at: new Date().toISOString() })
     .eq('id', propertyId);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   revalidatePath('/properties');
   revalidatePath(`/properties/${propertyId}`);
@@ -191,6 +193,8 @@ export async function markPropertyAsRented(propertyId: string) {
       details: { status: 'rented' },
     });
   }
+  
+  return { success: true };
 }
 
 export async function markPropertyAsAvailable(propertyId: string) {
@@ -208,17 +212,19 @@ export async function markPropertyAsAvailable(propertyId: string) {
     .update({ status: 'available', updated_at: new Date().toISOString() })
     .eq('id', propertyId);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   revalidatePath('/properties');
   revalidatePath(`/properties/${propertyId}`);
+  
+  return { success: true };
 }
 
 export async function deleteProperty(id: string) {
   const supabase = await createClient();
 
   const { error } = await supabase.from('properties').delete().eq('id', id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   revalidatePath('/properties');
   return { success: true };
@@ -227,7 +233,7 @@ export async function deleteProperty(id: string) {
 export async function getOwners() {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) return [];
+  if (!profile) return { data: [] };
 
   const { data, error } = await supabase
     .from('owners')
@@ -235,14 +241,14 @@ export async function getOwners() {
     .eq('broker_id', profile.id)
     .order('name');
 
-  if (error) throw new Error(error.message);
-  return data || [];
+  if (error) return { error: error.message };
+  return { data: data || [] };
 }
 
 export async function createOwner(data: { name: string; phone: string; email?: string; address?: string }) {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) throw new Error('Not authenticated');
+  if (!profile) return { error: 'Not authenticated' };
 
   const { data: owner, error } = await supabase
     .from('owners')
@@ -250,14 +256,14 @@ export async function createOwner(data: { name: string; phone: string; email?: s
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
-  return owner;
+  if (error) return { error: error.message };
+  return { data: owner };
 }
 
 export async function getMatchedProperties(lead: any) {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) return [];
+  if (!profile) return { data: [] };
 
   let query = supabase
     .from('properties')
@@ -280,6 +286,6 @@ export async function getMatchedProperties(lead: any) {
   }
 
   const { data, error } = await query.limit(5);
-  if (error) throw new Error(error.message);
-  return data || [];
+  if (error) return { error: error.message };
+  return { data: data || [] };
 }

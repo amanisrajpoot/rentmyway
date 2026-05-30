@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { getUserProfile } from '@/lib/actions/auth';
+import { logActivity } from './activity-log';
 import { revalidatePath } from 'next/cache';
 import type { UtilityBillInsert, UtilityBillUpdate } from '@/types/database';
 
@@ -15,7 +16,7 @@ export async function getUtilityBills(filters?: {
 }) {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) return [];
+  if (!profile) return { data: [] };
 
   let query = supabase
     .from('utility_bills')
@@ -30,14 +31,14 @@ export async function getUtilityBills(filters?: {
       .select('id')
       .eq('email', profile.email);
     const ownerIds = owners?.map(o => o.id) || [];
-    if (ownerIds.length === 0) return [];
+    if (ownerIds.length === 0) return { data: [] };
 
     const { data: properties } = await supabase
       .from('properties')
       .select('id')
       .in('owner_id', ownerIds);
     const propertyIds = properties?.map(p => p.id) || [];
-    if (propertyIds.length === 0) return [];
+    if (propertyIds.length === 0) return { data: [] };
 
     query = query.in('property_id', propertyIds);
   } else if (profile.role === 'tenant') {
@@ -47,7 +48,7 @@ export async function getUtilityBills(filters?: {
       .or(`profile_id.eq.${profile.id},email.eq.${profile.email}`)
       .eq('is_active', true)
       .single();
-    if (!tenant) return [];
+    if (!tenant) return { data: [] };
     query = query.eq('tenant_id', tenant.id);
   }
 
@@ -88,14 +89,14 @@ export async function getUtilityBills(filters?: {
   query = query.range(from, to);
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return data || [];
+  if (error) return { error: error.message };
+  return { data: data || [] };
 }
 
 export async function getUtilityBillStats() {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) return { totalAmount: 0, pendingAmount: 0 };
+  if (!profile) return { data: { totalAmount: 0, pendingAmount: 0 } };
 
   let query = supabase
     .from('utility_bills')
@@ -109,14 +110,14 @@ export async function getUtilityBillStats() {
       .select('id')
       .eq('email', profile.email);
     const ownerIds = owners?.map(o => o.id) || [];
-    if (ownerIds.length === 0) return { totalAmount: 0, pendingAmount: 0 };
+    if (ownerIds.length === 0) return { data: { totalAmount: 0, pendingAmount: 0 } };
 
     const { data: properties } = await supabase
       .from('properties')
       .select('id')
       .in('owner_id', ownerIds);
     const propertyIds = properties?.map(p => p.id) || [];
-    if (propertyIds.length === 0) return { totalAmount: 0, pendingAmount: 0 };
+    if (propertyIds.length === 0) return { data: { totalAmount: 0, pendingAmount: 0 } };
 
     query = query.in('property_id', propertyIds);
   } else if (profile.role === 'tenant') {
@@ -126,52 +127,87 @@ export async function getUtilityBillStats() {
       .or(`profile_id.eq.${profile.id},email.eq.${profile.email}`)
       .eq('is_active', true)
       .single();
-    if (!tenant) return { totalAmount: 0, pendingAmount: 0 };
+    if (!tenant) return { data: { totalAmount: 0, pendingAmount: 0 } };
     query = query.eq('tenant_id', tenant.id);
   }
 
-  const { data } = await query;
+  const { data, error } = await query;
+  if (error) return { error: error.message };
+  
   const bills = data || [];
 
   const totalAmount = bills.reduce((sum, b) => sum + b.amount, 0);
   const pendingAmount = bills.filter(b => b.status !== 'paid').reduce((sum, b) => sum + b.amount, 0);
 
-  return { totalAmount, pendingAmount };
+  return { data: { totalAmount, pendingAmount } };
 }
 
 export async function createUtilityBill(data: UtilityBillInsert) {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) throw new Error('Not authenticated');
+  if (!profile) return { error: 'Not authenticated' };
 
-  const { error } = await supabase.from('utility_bills').insert({
+  const { data: bill, error } = await supabase.from('utility_bills').insert({
     ...data,
     broker_id: profile.id,
+  }).select().single();
+
+  if (error) return { error: error.message };
+
+  await logActivity({
+    user_id: profile.id,
+    action: 'Created Utility Bill',
+    entity_type: 'utility_bill',
+    entity_id: bill.id,
+    details: { amount: data.amount, bill_type: data.bill_type, property_id: data.property_id },
   });
 
-  if (error) throw new Error(error.message);
   revalidatePath('/utility-bills');
   return { success: true };
 }
 
 export async function updateUtilityBill(id: string, data: UtilityBillUpdate) {
   const supabase = await createClient();
+  const profile = await getUserProfile();
 
   const { error } = await supabase
     .from('utility_bills')
     .update(data)
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
+
+  if (profile) {
+    await logActivity({
+      user_id: profile.id,
+      action: 'Updated Utility Bill',
+      entity_type: 'utility_bill',
+      entity_id: id,
+      details: { ...data },
+    });
+  }
+
   revalidatePath('/utility-bills');
   return { success: true };
 }
 
 export async function deleteUtilityBill(id: string) {
   const supabase = await createClient();
+  const profile = await getUserProfile();
 
   const { error } = await supabase.from('utility_bills').delete().eq('id', id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
+
+  if (profile) {
+    await logActivity({
+      user_id: profile.id,
+      action: 'Deleted Utility Bill',
+      entity_type: 'utility_bill',
+      entity_id: id,
+      details: { deleted: true },
+    });
+  }
+
   revalidatePath('/utility-bills');
   return { success: true };
 }
@@ -179,7 +215,7 @@ export async function deleteUtilityBill(id: string) {
 export async function getUtilityBillSummary(propertyId?: string) {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) return null;
+  if (!profile) return { error: 'Not authenticated' };
 
   let query = supabase
     .from('utility_bills')
@@ -190,7 +226,9 @@ export async function getUtilityBillSummary(propertyId?: string) {
     query = query.eq('property_id', propertyId);
   }
 
-  const { data } = await query;
+  const { data, error } = await query;
+  if (error) return { error: error.message };
+  
   const bills = data || [];
 
   const totalAmount = bills.reduce((sum, b) => sum + b.amount, 0);
@@ -203,5 +241,5 @@ export async function getUtilityBillSummary(propertyId?: string) {
     byType[b.bill_type] = (byType[b.bill_type] || 0) + b.amount;
   });
 
-  return { totalAmount, pendingAmount, paidAmount, byType };
+  return { data: { totalAmount, pendingAmount, paidAmount, byType } };
 }

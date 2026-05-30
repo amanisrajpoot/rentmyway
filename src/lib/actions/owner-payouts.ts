@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { getUserProfile } from '@/lib/actions/auth';
+import { logActivity } from './activity-log';
 import { revalidatePath } from 'next/cache';
 import type { OwnerPayoutInsert } from '@/types/database';
 
@@ -15,7 +16,7 @@ export async function getOwnerPayouts(filters?: {
 }) {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) return [];
+  if (!profile) return { data: [] };
 
   let query = supabase
     .from('owner_payouts')
@@ -30,7 +31,7 @@ export async function getOwnerPayouts(filters?: {
       .select('id')
       .eq('email', profile.email);
     const ownerIds = owners?.map(o => o.id) || [];
-    if (ownerIds.length === 0) return [];
+    if (ownerIds.length === 0) return { data: [] };
     query = query.in('owner_id', ownerIds);
   }
 
@@ -61,7 +62,7 @@ export async function getOwnerPayouts(filters?: {
     } else if (propertyIds.length > 0) {
       query = query.in('property_id', propertyIds);
     } else {
-      return []; // empty search match
+      return { data: [] }; // empty search match
     }
   }
 
@@ -73,27 +74,38 @@ export async function getOwnerPayouts(filters?: {
   query = query.range(from, to);
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return data || [];
+  if (error) return { error: error.message };
+  return { data: data || [] };
 }
 
 export async function createOwnerPayout(data: OwnerPayoutInsert) {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) throw new Error('Not authenticated');
+  if (!profile) return { error: 'Not authenticated' };
 
-  const { error } = await supabase.from('owner_payouts').insert({
+  const { data: payout, error } = await supabase.from('owner_payouts').insert({
     ...data,
     broker_id: profile.id,
+  }).select().single();
+
+  if (error) return { error: error.message };
+
+  await logActivity({
+    user_id: profile.id,
+    action: 'Created Owner Payout',
+    entity_type: 'payout',
+    entity_id: payout.id,
+    details: { amount: data.amount, owner_id: data.owner_id, property_id: data.property_id },
   });
 
-  if (error) throw new Error(error.message);
   revalidatePath('/payments');
   revalidatePath('/owner/financials');
+  return { success: true };
 }
 
 export async function markPayoutAsPaid(id: string, paymentDate: string, paymentMode: string) {
   const supabase = await createClient();
+  const profile = await getUserProfile();
 
   const { error } = await supabase
     .from('owner_payouts')
@@ -104,15 +116,27 @@ export async function markPayoutAsPaid(id: string, paymentDate: string, paymentM
     })
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
+
+  if (profile) {
+    await logActivity({
+      user_id: profile.id,
+      action: 'Marked Payout Paid',
+      entity_type: 'payout',
+      entity_id: id,
+      details: { payment_date: paymentDate, payment_mode: paymentMode },
+    });
+  }
+
   revalidatePath('/payments');
   revalidatePath('/owner/financials');
+  return { success: true };
 }
 
 export async function getPayoutSummary(ownerId?: string) {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) return null;
+  if (!profile) return { error: 'Not authenticated' };
 
   let query = supabase
     .from('owner_payouts')
@@ -125,11 +149,13 @@ export async function getPayoutSummary(ownerId?: string) {
     query = query.eq('owner_id', ownerId);
   }
 
-  const { data } = await query;
+  const { data, error } = await query;
+  if (error) return { error: error.message };
+  
   const payouts = data || [];
 
   const totalPaid = payouts.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0);
   const totalPending = payouts.filter(p => p.status === 'pending').reduce((sum, p) => sum + p.amount, 0);
 
-  return { totalPaid, totalPending, totalPayouts: payouts.length };
+  return { data: { totalPaid, totalPending, totalPayouts: payouts.length } };
 }

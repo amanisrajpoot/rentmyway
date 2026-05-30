@@ -20,7 +20,7 @@ export default async function PropertiesPage({
   const minRent = resolvedParams.minRent ? parseInt(resolvedParams.minRent, 10) : undefined;
   const maxRent = resolvedParams.maxRent ? parseInt(resolvedParams.maxRent, 10) : undefined;
 
-  const [properties, profile] = await Promise.all([
+  const [propertiesRes, profile] = await Promise.all([
     getProperties({
       status,
       type,
@@ -32,6 +32,8 @@ export default async function PropertiesPage({
     }),
     getUserProfile(),
   ]);
+
+  const properties = 'data' in propertiesRes && propertiesRes.data ? propertiesRes.data : [];
 
   return (
     <PropertiesClient

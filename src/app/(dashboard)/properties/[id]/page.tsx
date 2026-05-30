@@ -26,7 +26,10 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
   const { id } = await params;
   let property;
   try {
-    property = await getProperty(id);
+    const propertyRes = await getProperty(id);
+    if ('data' in propertyRes && propertyRes.data) {
+      property = propertyRes.data;
+    }
   } catch {
     notFound();
   }

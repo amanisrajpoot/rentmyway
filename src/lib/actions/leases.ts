@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { getUserProfile } from '@/lib/actions/auth';
+import { logActivity } from './activity-log';
 import { revalidatePath } from 'next/cache';
 import type { LeaseAgreementInsert, LeaseAgreementUpdate, LeaseStatus } from '@/types/database';
 
@@ -13,7 +14,7 @@ export async function getLeases(filters?: {
 }) {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) return [];
+  if (!profile) return { data: [] };
 
   let query = supabase
     .from('lease_agreements')
@@ -37,7 +38,7 @@ export async function getLeases(filters?: {
       .select('id')
       .in('owner_id', ownerIds);
     const propertyIds = properties?.map(p => p.id) || [];
-    if (propertyIds.length === 0) return [];
+    if (propertyIds.length === 0) return { data: [] };
 
     query = query.in('property_id', propertyIds);
   } else if (profile.role === 'tenant') {
@@ -48,7 +49,7 @@ export async function getLeases(filters?: {
       .or(`profile_id.eq.${profile.id},email.eq.${profile.email}`)
       .eq('is_active', true)
       .single();
-    if (!tenant) return [];
+    if (!tenant) return { data: [] };
     query = query.eq('tenant_id', tenant.id);
   }
 
@@ -73,7 +74,7 @@ export async function getLeases(filters?: {
     } else if (propertyIds.length > 0) {
       query = query.in('property_id', propertyIds);
     } else {
-      return [];
+      return { data: [] };
     }
   }
 
@@ -85,9 +86,9 @@ export async function getLeases(filters?: {
   query = query.range(from, to);
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
-  return data || [];
+  return { data: data || [] };
 }
 
 export async function getLease(id: string) {
@@ -99,14 +100,14 @@ export async function getLease(id: string) {
     .eq('id', id)
     .single();
 
-  if (error) throw new Error(error.message);
-  return data;
+  if (error) return { error: error.message };
+  return { data };
 }
 
 export async function createLease(data: LeaseAgreementInsert) {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) throw new Error('Not authenticated');
+  if (!profile) return { error: 'Not authenticated' };
 
   const { data: lease, error } = await supabase
     .from('lease_agreements')
@@ -117,11 +118,19 @@ export async function createLease(data: LeaseAgreementInsert) {
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
+
+  await logActivity({
+    user_id: profile.id,
+    action: 'Created Lease',
+    entity_type: 'lease',
+    entity_id: lease.id,
+    details: { tenant_id: lease.tenant_id, property_id: lease.property_id },
+  });
 
   revalidatePath('/leases');
   revalidatePath('/tenants');
-  return lease;
+  return { data: lease };
 }
 
 export async function updateLease(id: string, data: LeaseAgreementUpdate) {
@@ -132,10 +141,11 @@ export async function updateLease(id: string, data: LeaseAgreementUpdate) {
     .update({ ...data, updated_at: new Date().toISOString() })
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   revalidatePath('/leases');
   revalidatePath(`/leases/${id}`);
+  return { success: true };
 }
 
 export async function updateLeaseStatus(id: string, status: LeaseStatus, reason?: string) {
@@ -156,10 +166,30 @@ export async function updateLeaseStatus(id: string, status: LeaseStatus, reason?
     .update(updateData)
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
+
+  const profile = await getUserProfile();
+  if (profile) {
+    const actionMap: Record<string, string> = {
+      active: 'Activated Lease',
+      renewed: 'Renewed Lease',
+      terminated: 'Terminated Lease',
+      expired: 'Expired Lease',
+    };
+    if (actionMap[status]) {
+      await logActivity({
+        user_id: profile.id,
+        action: actionMap[status],
+        entity_type: 'lease',
+        entity_id: id,
+        details: { status, reason },
+      });
+    }
+  }
 
   revalidatePath('/leases');
   revalidatePath(`/leases/${id}`);
+  return { success: true };
 }
 
 export async function renewLease(
@@ -168,7 +198,7 @@ export async function renewLease(
 ) {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) throw new Error('Not authenticated');
+  if (!profile) return { error: 'Not authenticated' };
 
   // Mark old lease as renewed
   await supabase
@@ -188,10 +218,18 @@ export async function renewLease(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
+
+  await logActivity({
+    user_id: profile.id,
+    action: 'Renewed Lease',
+    entity_type: 'lease',
+    entity_id: newLease.id,
+    details: { old_lease_id: oldLeaseId, tenant_id: newLease.tenant_id },
+  });
 
   revalidatePath('/leases');
-  return newLease;
+  return { data: newLease };
 }
 
 export async function getExpiringLeases(daysAhead: number = 30) {
@@ -211,8 +249,8 @@ export async function getExpiringLeases(daysAhead: number = 30) {
     .gte('end_date', new Date().toISOString().split('T')[0])
     .order('end_date', { ascending: true });
 
-  if (error) throw new Error(error.message);
-  return data || [];
+  if (error) return { error: error.message };
+  return { data: data || [] };
 }
 
 export async function getLeaseForTenant(tenantId: string) {
@@ -227,14 +265,14 @@ export async function getLeaseForTenant(tenantId: string) {
     .limit(1)
     .single();
 
-  if (error && error.code !== 'PGRST116') throw new Error(error.message);
-  return data || null;
+  if (error && error.code !== 'PGRST116') return { error: error.message };
+  return { data: data || null };
 }
 
 export async function getLeaseStats() {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) return { activeCount: 0, totalMonthlyRent: 0, expiringCount: 0 };
+  if (!profile) return { data: { activeCount: 0, totalMonthlyRent: 0, expiringCount: 0 } };
 
   let query = supabase
     .from('lease_agreements')
@@ -255,7 +293,7 @@ export async function getLeaseStats() {
       .select('id')
       .in('owner_id', ownerIds);
     const propertyIds = properties?.map(p => p.id) || [];
-    if (propertyIds.length === 0) return { activeCount: 0, totalMonthlyRent: 0, expiringCount: 0 };
+    if (propertyIds.length === 0) return { data: { activeCount: 0, totalMonthlyRent: 0, expiringCount: 0 } };
 
     query = query.in('property_id', propertyIds);
   } else if (profile.role === 'tenant') {
@@ -265,12 +303,12 @@ export async function getLeaseStats() {
       .or(`profile_id.eq.${profile.id},email.eq.${profile.email}`)
       .eq('is_active', true)
       .single();
-    if (!tenant) return { activeCount: 0, totalMonthlyRent: 0, expiringCount: 0 };
+    if (!tenant) return { data: { activeCount: 0, totalMonthlyRent: 0, expiringCount: 0 } };
     query = query.eq('tenant_id', tenant.id);
   }
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   const leases = data || [];
   const activeCount = leases.filter(l => l.status === 'active').length;
@@ -290,8 +328,10 @@ export async function getLeaseStats() {
     .reduce((sum, l) => sum + l.monthly_rent, 0);
 
   return {
-    activeCount,
-    totalMonthlyRent,
-    expiringCount,
+    data: {
+      activeCount,
+      totalMonthlyRent,
+      expiringCount,
+    }
   };
 }

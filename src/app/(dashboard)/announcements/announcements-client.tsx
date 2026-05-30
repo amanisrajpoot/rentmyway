@@ -60,12 +60,14 @@ export function AnnouncementsClient({ initialAnnouncements }: { initialAnnouncem
       };
 
       const result = await createAnnouncement(data as any);
-      setAnnouncements([result, ...announcements]);
+      if (result && 'error' in result && result.error) throw new Error(result.error);
+      const newAnnouncement = result && 'data' in result ? result.data : result;
+      setAnnouncements([newAnnouncement, ...announcements]);
       toast.success('Announcement broadcasted');
       setDialogOpen(false);
       router.refresh();
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error(err.message || 'Failed to broadcast');
     } finally {
       setSaving(false);
     }
@@ -74,11 +76,12 @@ export function AnnouncementsClient({ initialAnnouncements }: { initialAnnouncem
   async function handleDelete(id: string) {
     if (!confirm('Are you sure you want to delete this announcement? This will not remove notifications already sent.')) return;
     try {
-      await deleteAnnouncement(id);
+      const res = await deleteAnnouncement(id);
+      if (res && 'error' in res && res.error) throw new Error(res.error);
       setAnnouncements(prev => prev.filter(a => a.id !== id));
       toast.success('Announcement deleted');
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error(err.message || 'Failed to delete announcement');
     }
   }
 

@@ -13,12 +13,14 @@ export default async function TenantsPage({
   const search = resolvedParams.search ?? '';
   const active = resolvedParams.active !== 'false'; // defaults to true if not explicitly 'false'
 
-  const tenants = await getTenants({
+  const tenantsRes = await getTenants({
     search,
     active,
     page: 0,
     limit: 12,
   });
+
+  const tenants = 'data' in tenantsRes && tenantsRes.data ? tenantsRes.data : [];
 
   return (
     <TenantsClient

@@ -2,7 +2,8 @@ import { getOwners } from '@/lib/actions/properties';
 import { PropertyForm } from '@/components/properties/property-form';
 
 export default async function NewPropertyPage() {
-  const owners = await getOwners();
+  const ownersRes = await getOwners();
+  const owners = 'data' in ownersRes && ownersRes.data ? ownersRes.data : [];
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">

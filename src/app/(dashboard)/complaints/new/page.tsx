@@ -145,7 +145,7 @@ export default function NewComplaintPage() {
       const supabase = createClient();
       const { data: prop } = await supabase.from('properties').select('broker_id').eq('id', selectedProperty).single();
 
-      await createComplaint({
+      const res = await createComplaint({
         title: formData.get('title') as string,
         description: (formData.get('description') as string) || null,
         tenant_id: selectedTenant,
@@ -159,10 +159,11 @@ export default function NewComplaintPage() {
         cost: null,
         images: images.length > 0 ? images : null,
       });
+      if (res && 'error' in res && res.error) throw new Error(res.error);
       toast.success('Complaint created');
       router.push('/complaints');
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create complaint');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create complaint');
     } finally {
       setLoading(false);
     }

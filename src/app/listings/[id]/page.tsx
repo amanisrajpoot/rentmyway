@@ -20,8 +20,9 @@ export default async function PublicListingPage({
   let errorMsg = '';
 
   try {
-    property = await getProperty(propertyId);
-    if (property) {
+    const propertyRes = await getProperty(propertyId);
+    if ('data' in propertyRes && propertyRes.data) {
+      property = propertyRes.data;
       const supabase = await createClient();
       const { data } = await supabase
         .from('profiles')
@@ -29,6 +30,8 @@ export default async function PublicListingPage({
         .eq('id', property.broker_id)
         .single();
       broker = data;
+    } else if ('error' in propertyRes && propertyRes.error) {
+      errorMsg = propertyRes.error;
     }
   } catch (err: any) {
     errorMsg = err.message || 'Property not found';

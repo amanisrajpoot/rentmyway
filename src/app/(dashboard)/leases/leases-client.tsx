@@ -102,12 +102,18 @@ export function LeasesClient({ initialLeases, stats, initialFilters }: LeasesCli
     setIsLoading(true);
     try {
       const nextPage = page + 1;
-      const nextLeases = await getLeases({
+      const res = await getLeases({
         search,
         status: statusFilter,
         page: nextPage,
         limit: 12,
       });
+
+      if ('error' in res && res.error) {
+        throw new Error(res.error);
+      }
+
+      const nextLeases = 'data' in res && res.data ? res.data : [];
 
       if (nextLeases.length < 12) {
         setHasMore(false);

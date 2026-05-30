@@ -85,7 +85,7 @@ export function DocumentsClient({ initialDocuments }: { initialDocuments: OwnerD
     const fd = new FormData(e.currentTarget);
 
     try {
-      await createOwnerDocument({
+      const res = await createOwnerDocument({
         owner_id: ownerId,
         property_id: fd.get('property_id') as string || null,
         doc_type: fd.get('doc_type') as any,
@@ -93,6 +93,9 @@ export function DocumentsClient({ initialDocuments }: { initialDocuments: OwnerD
         file_name: fd.get('file_name') as string || null,
         expiry_date: fd.get('expiry_date') as string || null,
       });
+      if ('error' in res && res.error) {
+        throw new Error(res.error);
+      }
       toast.success('Document uploaded to vault');
       setDialogOpen(false);
       router.refresh();
@@ -106,7 +109,10 @@ export function DocumentsClient({ initialDocuments }: { initialDocuments: OwnerD
   async function handleDelete(id: string) {
     if (!confirm('Are you sure you want to remove this document?')) return;
     try {
-      await deleteOwnerDocument(id);
+      const res = await deleteOwnerDocument(id);
+      if ('error' in res && res.error) {
+        throw new Error(res.error);
+      }
       toast.success('Document removed');
       window.location.reload();
     } catch (err: any) {

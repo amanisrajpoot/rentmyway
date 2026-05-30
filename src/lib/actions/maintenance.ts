@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { getUserProfile } from '@/lib/actions/auth';
+import { logActivity } from './activity-log';
 import { revalidatePath } from 'next/cache';
 import type { MaintenanceScheduleInsert, MaintenanceScheduleUpdate } from '@/types/database';
 
@@ -40,40 +41,60 @@ export async function getMaintenanceSchedule(propertyId?: string) {
   }
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return data || [];
+  if (error) return { error: error.message };
+  return { data: data || [] };
 }
 
 export async function createMaintenanceSchedule(data: MaintenanceScheduleInsert) {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) throw new Error('Not authenticated');
-
-  const { error } = await supabase.from('maintenance_schedule').insert({
+  const { data: schedule, error } = await supabase.from('maintenance_schedule').insert({
     ...data,
     broker_id: profile.id,
+  }).select().single();
+
+  if (error) return { error: error.message };
+
+  await logActivity({
+    user_id: profile.id,
+    action: 'Scheduled Maintenance',
+    entity_type: 'maintenance',
+    entity_id: schedule.id,
+    details: { property_id: data.property_id, title: data.title },
   });
 
-  if (error) throw new Error(error.message);
   revalidatePath('/maintenance');
   return { success: true };
 }
 
 export async function updateMaintenanceSchedule(id: string, data: MaintenanceScheduleUpdate) {
   const supabase = await createClient();
+  const profile = await getUserProfile();
 
   const { error } = await supabase
     .from('maintenance_schedule')
     .update(data)
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
+
+  if (profile) {
+    await logActivity({
+      user_id: profile.id,
+      action: 'Updated Maintenance',
+      entity_type: 'maintenance',
+      entity_id: id,
+      details: { ...data },
+    });
+  }
+
   revalidatePath('/maintenance');
   return { success: true };
 }
 
 export async function completeMaintenanceTask(id: string, cost: number, nextDueDate: string) {
   const supabase = await createClient();
+  const profile = await getUserProfile();
 
   const { error } = await supabase
     .from('maintenance_schedule')
@@ -83,7 +104,18 @@ export async function completeMaintenanceTask(id: string, cost: number, nextDueD
     })
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
+
+  if (profile) {
+    await logActivity({
+      user_id: profile.id,
+      action: 'Completed Maintenance',
+      entity_type: 'maintenance',
+      entity_id: id,
+      details: { cost, next_due: nextDueDate },
+    });
+  }
+
   revalidatePath('/maintenance');
   return { success: true };
 }

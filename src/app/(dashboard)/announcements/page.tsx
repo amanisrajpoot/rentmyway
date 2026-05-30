@@ -7,7 +7,8 @@ export default async function AnnouncementsPage() {
   const profile = await getUserProfile();
   if (!profile || profile.role !== 'broker') redirect('/dashboard');
 
-  const announcements = await getAnnouncements();
+  const res = await getAnnouncements();
+  const announcements = Array.isArray(res) ? res : ('data' in res && res.data ? res.data : []);
 
   return (
     <div className="space-y-6">

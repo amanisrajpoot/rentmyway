@@ -100,11 +100,14 @@ export function PropertyForm({ owners: initialOwners, property }: PropertyFormPr
 
       if (property) {
         const { broker_id, ...updatePayload } = payload;
-        await updateProperty(property.id, updatePayload);
+        const res = await updateProperty(property.id, updatePayload);
+        if (res && 'error' in res && res.error) throw new Error(res.error);
         toast.success('Property updated successfully');
         router.push(`/properties/${property.id}`);
       } else {
-        const newProperty = await createProperty(payload as any);
+        const res = await createProperty(payload as any);
+        if (res && 'error' in res && res.error) throw new Error(res.error);
+        const newProperty = res && 'data' in res ? res.data : res;
         toast.success('Property created successfully');
         router.push(`/properties/${newProperty.id}`);
       }
@@ -118,11 +121,13 @@ export function PropertyForm({ owners: initialOwners, property }: PropertyFormPr
 
   async function handleCreateOwner(formData: FormData) {
     try {
-      const owner = await createOwner({
+      const res = await createOwner({
         name: formData.get('owner_name') as string,
         phone: formData.get('owner_phone') as string,
         email: (formData.get('owner_email') as string) || undefined,
       });
+      if (res && 'error' in res && res.error) throw new Error(res.error);
+      const owner = res && 'data' in res ? res.data : res;
       setOwners((prev) => [...prev, owner]);
       update('owner_id', owner.id);
       setOwnerDialogOpen(false);

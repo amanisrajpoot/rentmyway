@@ -98,12 +98,13 @@ export function CommissionsClient({ initialCommissions, stats }: { initialCommis
         status: 'pending',
       };
 
-      await createCommission(data as any);
+      const res = await createCommission(data as any);
+      if (res && 'error' in res && res.error) throw new Error(res.error);
       toast.success('Commission recorded');
       setDialogOpen(false);
       router.refresh();
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error(err.message || 'Failed to record commission');
     } finally {
       setSaving(false);
     }
@@ -111,22 +112,24 @@ export function CommissionsClient({ initialCommissions, stats }: { initialCommis
 
   async function handleStatusUpdate(id: string, status: string) {
     try {
-      await updateCommission(id, { status: status as any });
+      const res = await updateCommission(id, { status: status as any });
+      if (res && 'error' in res && res.error) throw new Error(res.error);
       toast.success('Status updated');
       router.refresh();
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error(err.message || 'Failed to update status');
     }
   }
 
   async function handleDelete(id: string) {
     if (!confirm('Are you sure you want to delete this record?')) return;
     try {
-      await deleteCommission(id);
+      const res = await deleteCommission(id);
+      if (res && 'error' in res && res.error) throw new Error(res.error);
       toast.success('Record deleted');
       router.refresh();
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error(err.message || 'Failed to delete record');
     }
   }
 

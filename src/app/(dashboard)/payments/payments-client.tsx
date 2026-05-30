@@ -140,7 +140,10 @@ export function PaymentsClient({
     setRunningAutomation(true);
     try {
       const res = await runRentAutomation();
-      toast.success(`Automation scan completed! ${res.updatedCount} schedule(s) marked overdue and notifications sent.`);
+      if ('error' in res && res.error) {
+        throw new Error(res.error);
+      }
+      toast.success(`Automation scan completed! ${res.data?.updatedCount || 0} schedule(s) marked overdue and notifications sent.`);
       router.refresh();
     } catch (err: any) {
       toast.error(err.message || 'Failed to trigger reminders automation scan');
@@ -206,11 +209,17 @@ export function PaymentsClient({
     setPaymentsLoading(true);
     try {
       const nextPage = paymentsPage + 1;
-      const nextPayments = await getPayments({
+      const nextPaymentsRes = await getPayments({
         search,
         page: nextPage,
         limit: 12,
       });
+
+      if ('error' in nextPaymentsRes && nextPaymentsRes.error) {
+        toast.error(nextPaymentsRes.error);
+        return;
+      }
+      const nextPayments = 'data' in nextPaymentsRes && nextPaymentsRes.data ? nextPaymentsRes.data : [];
 
       if (nextPayments.length < 12) {
         setPaymentsHasMore(false);
@@ -218,7 +227,7 @@ export function PaymentsClient({
       setPayments((prev) => [...prev, ...(nextPayments as PaymentWithJoins[])]);
       setPaymentsPage(nextPage);
     } catch {
-      toast.error('Failed to load more payments');
+      toast.error('Failed to load more payments due to an unexpected error');
     } finally {
       setPaymentsLoading(false);
     }
@@ -229,12 +238,19 @@ export function PaymentsClient({
     setPayoutsLoading(true);
     try {
       const nextPage = payoutsPage + 1;
-      const nextPayouts = await getOwnerPayouts({
+      const nextPayoutsRes = await getOwnerPayouts({
         search,
         status: statusFilter,
         page: nextPage,
         limit: 12,
       });
+
+      if ('error' in nextPayoutsRes && nextPayoutsRes.error) {
+        toast.error(nextPayoutsRes.error);
+        return;
+      }
+      
+      const nextPayouts = 'data' in nextPayoutsRes && nextPayoutsRes.data ? nextPayoutsRes.data : [];
 
       if (nextPayouts.length < 12) {
         setPayoutsHasMore(false);
@@ -242,7 +258,7 @@ export function PaymentsClient({
       setPayouts((prev) => [...prev, ...nextPayouts]);
       setPayoutsPage(nextPage);
     } catch {
-      toast.error('Failed to load more payouts');
+      toast.error('Failed to load more payouts due to an unexpected error');
     } finally {
       setPayoutsLoading(false);
     }
@@ -269,7 +285,7 @@ export function PaymentsClient({
     const fd = new FormData(e.currentTarget);
 
     try {
-      await recordPayment({
+      const res = await recordPayment({
         tenant_id: selectedTenant,
         property_id: activeTenant.property_id,
         amount: parseFloat(fd.get('amount') as string),
@@ -278,6 +294,11 @@ export function PaymentsClient({
         month_year: fd.get('month_year') as string,
         notes: (fd.get('notes') as string) || null,
       });
+      
+      if ('error' in res && res.error) {
+        throw new Error(res.error);
+      }
+      
       toast.success('Payment recorded');
       setDialogOpen(false);
       router.refresh();
@@ -292,7 +313,10 @@ export function PaymentsClient({
     if (!confirm('Mark this payout as completed?')) return;
     try {
       const date = new Date().toISOString().split('T')[0];
-      await markPayoutAsPaid(id, date, 'bank_transfer');
+      const res = await markPayoutAsPaid(id, date, 'bank_transfer');
+      if ('error' in res && res.error) {
+        throw new Error(res.error);
+      }
       toast.success('Payout marked as paid');
       router.refresh();
     } catch (err: any) {

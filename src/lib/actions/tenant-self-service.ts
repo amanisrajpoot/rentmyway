@@ -8,7 +8,7 @@ import type { MoveOutRequestInsert, MoveOutRequestUpdate, EmergencyContactInsert
 export async function getMoveOutRequests() {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) return [];
+  if (!profile) return { data: [] };
 
   let query = supabase
     .from('move_out_requests')
@@ -23,20 +23,21 @@ export async function getMoveOutRequests() {
       .select('id')
       .eq('profile_id', profile.id)
       .single();
-    if (!tenant) return [];
+    if (!tenant) return { data: [] };
     query = query.eq('tenant_id', tenant.id);
   }
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return data || [];
+  if (error) return { error: error.message };
+  return { data: data || [] };
 }
 
 export async function createMoveOutRequest(data: MoveOutRequestInsert) {
   const supabase = await createClient();
   const { error } = await supabase.from('move_out_requests').insert(data);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath('/dashboard');
+  return { success: true };
 }
 
 export async function updateMoveOutRequest(id: string, data: MoveOutRequestUpdate) {
@@ -45,8 +46,9 @@ export async function updateMoveOutRequest(id: string, data: MoveOutRequestUpdat
     .from('move_out_requests')
     .update({ ...data, updated_at: new Date().toISOString() })
     .eq('id', id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath('/dashboard');
+  return { success: true };
 }
 
 export async function getEmergencyContacts(propertyId: string) {
@@ -56,13 +58,14 @@ export async function getEmergencyContacts(propertyId: string) {
     .select('*')
     .eq('property_id', propertyId)
     .eq('is_active', true);
-  if (error) throw new Error(error.message);
-  return data || [];
+  if (error) return { error: error.message };
+  return { data: data || [] };
 }
 
 export async function createEmergencyContact(data: EmergencyContactInsert) {
   const supabase = await createClient();
   const { error } = await supabase.from('emergency_contacts').insert(data);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath('/properties');
+  return { success: true };
 }

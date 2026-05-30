@@ -15,8 +15,8 @@ export async function getNotifications() {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
-  return data as Notification[];
+  if (error) return { error: error.message };
+  return { data: data as Notification[] };
 }
 
 export async function getUnreadCount() {
@@ -41,8 +41,9 @@ export async function markAsRead(id: string) {
     .update({ is_read: true })
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath('/notifications');
+  return { success: true };
 }
 
 export async function markAllAsRead() {
@@ -56,8 +57,9 @@ export async function markAllAsRead() {
     .eq('user_id', user.id)
     .eq('is_read', false);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath('/notifications');
+  return { success: true };
 }
 
 /**

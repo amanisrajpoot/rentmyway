@@ -13,7 +13,7 @@ export default async function LeasesPage({
   const search = resolvedParams.search ?? '';
   const status = resolvedParams.status ?? 'all';
 
-  const [leases, stats] = await Promise.all([
+  const [leasesRes, statsRes] = await Promise.all([
     getLeases({
       search,
       status,
@@ -25,8 +25,8 @@ export default async function LeasesPage({
 
   return (
     <LeasesClient
-      initialLeases={leases as any}
-      stats={stats}
+      initialLeases={(leasesRes as any).data || []}
+      stats={(statsRes as any).data || { activeCount: 0, totalMonthlyRent: 0, expiringCount: 0 }}
       initialFilters={{
         search,
         status,

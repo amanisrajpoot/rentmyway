@@ -125,12 +125,19 @@ export function LeadsClient({ initialLeads, initialSiteVisits, initialFilters }:
     setIsLoading(true);
     try {
       const nextPage = page + 1;
-      const nextLeads = await getLeads({
+      const nextLeadsRes = await getLeads({
         search,
         status: statusFilter,
         page: nextPage,
         limit: 12,
       });
+      
+      if ('error' in nextLeadsRes && nextLeadsRes.error) {
+        toast.error(nextLeadsRes.error);
+        return;
+      }
+
+      const nextLeads = 'data' in nextLeadsRes && nextLeadsRes.data ? nextLeadsRes.data : [];
 
       if (nextLeads.length < 12) {
         setHasMore(false);
@@ -138,7 +145,7 @@ export function LeadsClient({ initialLeads, initialSiteVisits, initialFilters }:
       setLeads((prev) => [...prev, ...nextLeads]);
       setPage(nextPage);
     } catch {
-      toast.error('Failed to load more leads');
+      toast.error('Failed to load more leads due to an unexpected error');
     } finally {
       setIsLoading(false);
     }
@@ -165,13 +172,16 @@ export function LeadsClient({ initialLeads, initialSiteVisits, initialFilters }:
     );
 
     try {
-      await updateLeadStage(leadId, newStatus);
+      const res = await updateLeadStage(leadId, newStatus);
+      if ('error' in res && res.error) {
+        throw new Error(res.error);
+      }
       toast.success(`Moved to ${LEAD_STAGE_LABELS[newStatus]}`);
-    } catch {
+    } catch (err: unknown) {
       setLeads((prev) =>
         prev.map((l) => (l.id === leadId ? { ...l, status: lead.status } : l))
       );
-      toast.error('Failed to update lead stage');
+      toast.error(err instanceof Error ? err.message : 'Failed to update lead stage');
     }
   }
 
@@ -182,7 +192,11 @@ export function LeadsClient({ initialLeads, initialSiteVisits, initialFilters }:
     }
     setConvertLoading(true);
     try {
-      await convertLead(convertingLeadId, selectedPropertyId);
+      const res = await convertLead(convertingLeadId, selectedPropertyId);
+      if ('error' in res && res.error) {
+        throw new Error(res.error);
+      }
+      
       setLeads((prev) =>
         prev.map((l) => (l.id === convertingLeadId ? { ...l, status: 'converted' as LeadStatus } : l))
       );
@@ -217,13 +231,16 @@ export function LeadsClient({ initialLeads, initialSiteVisits, initialFilters }:
     );
 
     try {
-      await updateLeadStage(leadId, targetStatus);
+      const res = await updateLeadStage(leadId, targetStatus);
+      if ('error' in res && res.error) {
+        throw new Error(res.error);
+      }
       toast.success(`Moved to ${LEAD_STAGE_LABELS[targetStatus]}`);
-    } catch {
+    } catch (err: unknown) {
       setLeads((prev) =>
         prev.map((l) => (l.id === leadId ? { ...l, status: previousStatus } : l))
       );
-      toast.error('Failed to update lead stage');
+      toast.error(err instanceof Error ? err.message : 'Failed to update lead stage');
     }
   }
 

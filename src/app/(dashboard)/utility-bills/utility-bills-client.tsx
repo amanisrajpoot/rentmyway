@@ -130,7 +130,7 @@ export function UtilityBillsClient({
     setLoading(true);
     try {
       const nextPage = page + 1;
-      const nextBills = await getUtilityBills({
+      const nextBillsRes = await getUtilityBills({
         search,
         billType: typeFilter,
         status: statusFilter,
@@ -138,13 +138,20 @@ export function UtilityBillsClient({
         limit: 12,
       });
 
+      if ('error' in nextBillsRes && nextBillsRes.error) {
+        toast.error(nextBillsRes.error);
+        return;
+      }
+
+      const nextBills = 'data' in nextBillsRes && nextBillsRes.data ? nextBillsRes.data : [];
+
       if (nextBills.length < 12) {
         setHasMore(false);
       }
       setBills((prev) => [...prev, ...(nextBills as BillWithJoins[])]);
       setPage(nextPage);
     } catch {
-      toast.error('Failed to load more bills');
+      toast.error('Failed to load more bills due to an unexpected error');
     } finally {
       setLoading(false);
     }
@@ -157,7 +164,7 @@ export function UtilityBillsClient({
     const matchedTenant = tenants.find(t => t.property_id === selectedProperty);
 
     try {
-      await createUtilityBill({
+      const res = await createUtilityBill({
         property_id: selectedProperty,
         tenant_id: matchedTenant?.id || null,
         broker_id: '',
@@ -171,6 +178,11 @@ export function UtilityBillsClient({
         bill_image_url: null,
         notes: (fd.get('notes') as string) || null,
       });
+      
+      if ('error' in res && res.error) {
+        throw new Error(res.error);
+      }
+      
       toast.success('Bill recorded');
       setDialogOpen(false);
       router.refresh();
@@ -183,11 +195,14 @@ export function UtilityBillsClient({
 
   async function handleMarkPaid(id: string) {
     try {
-      await updateUtilityBill(id, { status: 'paid' });
+      const res = await updateUtilityBill(id, { status: 'paid' });
+      if ('error' in res && res.error) {
+        throw new Error(res.error);
+      }
       toast.success('Bill marked as paid');
       router.refresh();
-    } catch {
-      toast.error('Failed to update');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update');
     }
   }
 

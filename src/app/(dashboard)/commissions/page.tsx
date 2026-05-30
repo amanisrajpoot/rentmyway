@@ -7,10 +7,13 @@ export default async function CommissionsPage() {
   const profile = await getUserProfile();
   if (!profile || profile.role !== 'broker') redirect('/dashboard');
 
-  const [commissions, stats] = await Promise.all([
+  const [commissionsRes, statsRes] = await Promise.all([
     getCommissions(),
     getCommissionStats()
   ]);
+
+  const commissions = Array.isArray(commissionsRes) ? commissionsRes : ('data' in commissionsRes && commissionsRes.data ? commissionsRes.data : []);
+  const stats = statsRes && 'data' in statsRes && statsRes.data ? statsRes.data : { total: 0, received: 0, pending: 0 };
 
   return (
     <div className="space-y-6">

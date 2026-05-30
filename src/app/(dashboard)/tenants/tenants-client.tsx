@@ -74,12 +74,19 @@ export function TenantsClient({ initialTenants, initialFilters }: TenantsClientP
     setIsLoading(true);
     try {
       const nextPage = page + 1;
-      const nextTenants = await getTenants({
+      const nextTenantsRes = await getTenants({
         search,
         active: showActive,
         page: nextPage,
         limit: 12,
       });
+
+      if ('error' in nextTenantsRes && nextTenantsRes.error) {
+        toast.error(nextTenantsRes.error);
+        return;
+      }
+
+      const nextTenants = 'data' in nextTenantsRes && nextTenantsRes.data ? nextTenantsRes.data : [];
 
       if (nextTenants.length < 12) {
         setHasMore(false);
@@ -87,7 +94,7 @@ export function TenantsClient({ initialTenants, initialFilters }: TenantsClientP
       setTenants((prev) => [...prev, ...(nextTenants as TenantWithProperty[])]);
       setPage(nextPage);
     } catch {
-      toast.error('Failed to load more tenants');
+      toast.error('Failed to load more tenants due to an unexpected error');
     } finally {
       setIsLoading(false);
     }

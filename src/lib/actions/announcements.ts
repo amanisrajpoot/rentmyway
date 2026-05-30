@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { logActivity } from './activity-log';
 import type { Announcement, AnnouncementInsert } from '@/types/database';
 import { createNotification } from './notifications';
 
@@ -15,20 +16,21 @@ export async function getAnnouncements() {
     .select('*, property:properties(title)')
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
-  return data as (Announcement & { property?: { title: string } | null })[];
+  if (error) return { error: error.message };
+  return { data: data as (Announcement & { property?: { title: string } | null })[] };
 }
 
 export async function createAnnouncement(data: AnnouncementInsert) {
   const supabase = await createClient();
-  
+  const { data: { user } } = await supabase.auth.getUser();
+
   const { data: announcement, error } = await supabase
     .from('announcements')
     .insert(data)
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   // Broadcast notifications to targets
   // This is a simplified version; in production, you'd use a background worker or edge function
@@ -58,8 +60,18 @@ export async function createAnnouncement(data: AnnouncementInsert) {
     }
   }
 
+  if (user) {
+    await logActivity({
+      user_id: user.id,
+      action: 'Created Announcement',
+      entity_type: 'announcement',
+      entity_id: announcement.id,
+      details: { title: data.title, target: data.target_role },
+    });
+  }
+
   revalidatePath('/announcements');
-  return announcement;
+  return { success: true, data: announcement };
 }
 
 export async function deleteAnnouncement(id: string) {
@@ -69,6 +81,19 @@ export async function deleteAnnouncement(id: string) {
     .delete()
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    await logActivity({
+      user_id: user.id,
+      action: 'Deleted Announcement',
+      entity_type: 'announcement',
+      entity_id: id,
+      details: { deleted: true },
+    });
+  }
+
   revalidatePath('/announcements');
+  return { success: true };
 }

@@ -46,10 +46,11 @@ export function NotificationBell() {
 
   const fetchNotifications = async () => {
     try {
-      const [data, count] = await Promise.all([
+      const [res, count] = await Promise.all([
         getNotifications(),
         getUnreadCount()
       ]);
+      const data = 'data' in res && res.data ? res.data : [];
       setNotifications(data);
       setUnreadCount(count);
     } catch (error) {

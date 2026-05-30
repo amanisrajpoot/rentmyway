@@ -13,16 +13,17 @@ export default async function ComplaintsPage({
   const search = resolvedParams.search ?? '';
   const status = resolvedParams.status ?? 'all';
 
-  const complaints = await getComplaints({
+  const res = await getComplaints({
     search,
     status,
     page: 0,
     limit: 12,
   });
+  const complaints = Array.isArray(res) ? res : ('data' in res && res.data ? res.data : []);
 
   return (
     <ComplaintsClient
-      initialComplaints={complaints}
+      initialComplaints={complaints as any}
       initialFilters={{
         search,
         status,

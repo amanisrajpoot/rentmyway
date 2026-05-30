@@ -46,20 +46,22 @@ export function NotificationsClient({ initialNotifications }: { initialNotificat
 
   const handleMarkAsRead = async (id: string) => {
     try {
-      await markAsRead(id);
+      const res = await markAsRead(id);
+      if (res && 'error' in res && res.error) throw new Error(res.error);
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
-    } catch (error) {
-      toast.error('Failed to update');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update');
     }
   };
 
   const handleMarkAll = async () => {
     try {
-      await markAllAsRead();
+      const res = await markAllAsRead();
+      if (res && 'error' in res && res.error) throw new Error(res.error);
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       toast.success('All marked as read');
-    } catch (error) {
-      toast.error('Failed to update');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update');
     }
   };
 

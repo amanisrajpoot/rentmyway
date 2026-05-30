@@ -2,7 +2,8 @@ import { getNotifications } from '@/lib/actions/notifications';
 import { NotificationsClient } from './notifications-client';
 
 export default async function NotificationsPage() {
-  const notifications = await getNotifications();
+  const res = await getNotifications();
+  const notifications = Array.isArray(res) ? res : ('data' in res && res.data ? res.data : []);
 
   return (
     <div className="max-w-4xl mx-auto py-6 space-y-6">

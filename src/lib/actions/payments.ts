@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { getUserProfile } from '@/lib/actions/auth';
+import { logActivity } from './activity-log';
 import { revalidatePath } from 'next/cache';
 import type { RentPaymentInsert } from '@/types/database';
 
@@ -12,7 +13,7 @@ export async function getPayments(filters?: {
 }) {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) return [];
+  if (!profile) return { data: [] };
 
   let query = supabase
     .from('rent_payments')
@@ -28,7 +29,7 @@ export async function getPayments(filters?: {
     if (propIds.length > 0) {
       query = query.in('property_id', propIds);
     } else {
-      return [];
+      return { data: [] };
     }
   }
 
@@ -49,7 +50,7 @@ export async function getPayments(filters?: {
     } else if (propertyIds.length > 0) {
       query = query.in('property_id', propertyIds);
     } else {
-      return []; // empty search match
+      return { data: [] }; // empty search match
     }
   }
 
@@ -61,24 +62,40 @@ export async function getPayments(filters?: {
   query = query.range(from, to);
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return data || [];
+  if (error) return { error: error.message };
+  return { data: data || [] };
 }
 
 export async function recordPayment(data: RentPaymentInsert) {
   const supabase = await createClient();
+  const profile = await getUserProfile();
 
-  const { error } = await supabase.from('rent_payments').insert(data);
-  if (error) throw new Error(error.message);
+  const { data: payment, error } = await supabase.from('rent_payments').insert(data).select().single();
+  if (error) return { error: error.message };
+
+  if (profile) {
+    await logActivity({
+      user_id: profile.id,
+      action: 'Recorded Payment',
+      entity_type: 'payment',
+      entity_id: payment.id,
+      details: {
+        amount: data.amount,
+        tenant_id: data.tenant_id,
+        property_id: data.property_id,
+        method: data.payment_mode
+      },
+    });
+  }
 
   revalidatePath('/payments');
-  return { success: true };
+  return { success: true, data: payment };
 }
 
 export async function getFinancialStats() {
   const supabase = await createClient();
   const profile = await getUserProfile();
-  if (!profile) return { totalCollected: 0, totalPayouts: 0, pendingPayouts: 0, totalCollectionsCount: 0, totalPayoutsCount: 0 };
+  if (!profile) return { data: { totalCollected: 0, totalPayouts: 0, pendingPayouts: 0, totalCollectionsCount: 0, totalPayoutsCount: 0 } };
 
   // Calculate collections sum
   let paymentsQuery = supabase
@@ -98,7 +115,9 @@ export async function getFinancialStats() {
     }
   }
 
-  const { data: paymentsData } = await paymentsQuery;
+  const { data: paymentsData, error: paymentsError } = await paymentsQuery;
+  if (paymentsError) return { error: paymentsError.message };
+  
   const totalCollected = paymentsData?.reduce((sum, p) => sum + p.amount, 0) || 0;
   const totalCollectionsCount = paymentsData?.length || 0;
 
@@ -122,16 +141,20 @@ export async function getFinancialStats() {
     }
   }
 
-  const { data: payoutsData } = await payoutsQuery;
+  const { data: payoutsData, error: payoutsError } = await payoutsQuery;
+  if (payoutsError) return { error: payoutsError.message };
+  
   const totalPayouts = payoutsData?.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0) || 0;
   const pendingPayouts = payoutsData?.filter(p => p.status === 'pending').reduce((sum, p) => sum + p.amount, 0) || 0;
   const totalPayoutsCount = payoutsData?.length || 0;
 
   return {
-    totalCollected,
-    totalPayouts,
-    pendingPayouts,
-    totalCollectionsCount,
-    totalPayoutsCount,
+    data: {
+      totalCollected,
+      totalPayouts,
+      pendingPayouts,
+      totalCollectionsCount,
+      totalPayoutsCount,
+    }
   };
 }

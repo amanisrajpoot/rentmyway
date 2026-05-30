@@ -18,7 +18,10 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
   const { id } = await params;
   let tenant;
   try {
-    tenant = await getTenant(id);
+    const tenantRes = await getTenant(id);
+    if ('data' in tenantRes && tenantRes.data) {
+      tenant = tenantRes.data;
+    }
   } catch {
     notFound();
   }

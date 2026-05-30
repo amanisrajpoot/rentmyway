@@ -45,12 +45,17 @@ export function OwnersClient({ initialOwners }: { initialOwners: Owner[] }) {
     const fd = new FormData(e.currentTarget);
 
     try {
-      await createOwner({
+      const res = await createOwner({
         name: fd.get('name') as string,
         phone: fd.get('phone') as string,
         email: (fd.get('email') as string) || undefined,
         address: (fd.get('address') as string) || undefined,
       });
+      
+      if ('error' in res && res.error) {
+        throw new Error(res.error);
+      }
+      
       toast.success('Owner added successfully');
       setDialogOpen(false);
       router.refresh();
