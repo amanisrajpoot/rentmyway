@@ -41,6 +41,9 @@ export default async function HomePage() {
               </Link>
             ) : (
               <>
+                <Link href="/explore" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:inline-block">
+                  Explore
+                </Link>
                 <Link href="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:inline-block">
                   Log in
                 </Link>
@@ -77,6 +80,11 @@ export default async function HomePage() {
           <Link href={profile ? "/dashboard" : "/signup"}>
             <Button size="lg" className="h-14 px-8 rounded-full bg-foreground text-background hover:bg-foreground/90 font-semibold text-base transition-transform hover:scale-105">
               {profile ? "Enter Workspace" : "Start Managing Now"} <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+          </Link>
+          <Link href="/explore">
+            <Button size="lg" variant="outline" className="h-14 px-8 rounded-full border-white/20 bg-white/5 hover:bg-white/10 font-semibold text-base backdrop-blur-md transition-all w-full">
+              Browse Properties
             </Button>
           </Link>
         </div>

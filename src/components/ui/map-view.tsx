@@ -21,6 +21,13 @@ interface MapViewProps {
   city: string;
 }
 
+const CITY_CENTERS: Record<string, [number, number]> = {
+  'Mumbai': [19.0760, 72.8777],
+  'Pune': [18.5204, 73.8567],
+  'Bangalore': [12.9716, 77.5946],
+  'Delhi': [28.7041, 77.1025],
+};
+
 function ChangeView({ center }: { center: [number, number] }) {
   const map = useMap();
   useEffect(() => {
@@ -30,16 +37,29 @@ function ChangeView({ center }: { center: [number, number] }) {
 }
 
 export default function MapView({ address, locality, city }: MapViewProps) {
-  const [position, setPosition] = useState<[number, number]>([19.076, 72.8777]); // Default Mumbai
+  const fallbackCenter = CITY_CENTERS[city] || [19.076, 72.8777];
+  const [position, setPosition] = useState<[number, number]>(fallbackCenter);
   const [loading, setLoading] = useState(true);
   const [displayAddress, setDisplayAddress] = useState(`${locality}, ${city}`);
 
   useEffect(() => {
     async function geocode() {
       try {
-        // Try searching for locality and city first for highly reliable coordinates
+        if (sessionStorage.getItem('nominatim_blocked')) {
+          console.warn(`Skipping geocoding for ${locality} because API is rate-limited.`);
+          throw new Error('API Rate Limited');
+        }
+
         const query = encodeURIComponent(`${locality}, ${city}`);
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`);
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1&email=contact@rentmyway.com`);
+        
+        if (!res.ok) {
+          if (res.status === 429) {
+            sessionStorage.setItem('nominatim_blocked', 'true');
+          }
+          throw new Error(`HTTP Status ${res.status}`);
+        }
+
         const data = await res.json();
 
         if (data && data.length > 0) {
@@ -47,7 +67,9 @@ export default function MapView({ address, locality, city }: MapViewProps) {
           setDisplayAddress(data[0].display_name || `${locality}, ${city}`);
         }
       } catch (err) {
-        console.error('Geocoding error:', err);
+        // Only log once as a warning, then fail gracefully to the dynamic city center
+        console.warn(`Geocoding error, falling back to ${city} city center:`, err);
+        setPosition(fallbackCenter);
       } finally {
         setLoading(false);
       }

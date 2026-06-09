@@ -478,6 +478,23 @@ export interface EmergencyContact {
   property?: Property;
 }
 
+export type EnquiryStatus = 'new' | 'contacted' | 'converted' | 'spam';
+
+export interface Enquiry {
+  id: string;
+  property_id: string;
+  broker_id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  message: string | null;
+  source: string;
+  status: EnquiryStatus;
+  created_at: string;
+  // Joined
+  property?: Property;
+}
+
 
 
 // ============================================
@@ -571,6 +588,12 @@ export type BrokerCommissionUpdate = Partial<BrokerCommissionInsert>;
 
 export type BrokerExpenseInsert = Omit<BrokerExpense, 'id' | 'created_at'>;
 export type BrokerExpenseUpdate = Partial<BrokerExpenseInsert>;
+
+export type EnquiryInsert = Omit<Enquiry, 'id' | 'created_at' | 'property' | 'status' | 'source'> & {
+  status?: EnquiryStatus;
+  source?: string;
+};
+export type EnquiryUpdate = Partial<EnquiryInsert>;
 
 // ============================================
 // UI Helper Types

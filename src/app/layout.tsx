@@ -22,7 +22,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} dark h-full antialiased`} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} dark h-full antialiased`} data-scroll-behavior="smooth" suppressHydrationWarning>
       <body className="min-h-full flex flex-col font-sans">
         {children}
         <Toaster richColors position="top-right" />
