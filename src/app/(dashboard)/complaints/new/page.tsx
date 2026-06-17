@@ -158,6 +158,8 @@ export default function NewComplaintPage() {
         resolution_notes: null,
         cost: null,
         images: images.length > 0 ? images : null,
+        auto_delegated: false,
+        delegated_team_id: null,
       });
       if (res && 'error' in res && res.error) throw new Error(res.error);
       toast.success('Complaint created');
