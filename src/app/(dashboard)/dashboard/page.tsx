@@ -68,7 +68,8 @@ async function getTenantStats(email: string) {
   if (tenant.tenant_type === 'pg' && tenant.pg_bed_id) {
     const { data: bed } = await supabase.from('pg_beds').select('bed_number, room:pg_rooms(room_number)').eq('id', tenant.pg_bed_id).single();
     if (bed) {
-      pgInfo = { room: bed.room?.room_number, bed: bed.bed_number };
+      const roomObj = Array.isArray(bed.room) ? bed.room[0] : bed.room;
+      pgInfo = { room: (roomObj as any)?.room_number, bed: bed.bed_number };
     }
   }
 
