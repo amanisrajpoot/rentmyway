@@ -192,9 +192,14 @@ export function ComplaintsClient({
                             <p className="text-sm text-muted-foreground mt-0.5">{complaint.description}</p>
                           )}
                         </div>
-                        <Badge className={statusColors[complaint.status]}>
-                          {COMPLAINT_STATUS_LABELS[complaint.status]}
-                        </Badge>
+                        <div className="flex gap-2">
+                          {complaint.auto_delegated && (
+                            <Badge variant="outline" className="border-emerald-500/30 text-emerald-500 bg-emerald-500/10">Auto-Delegated</Badge>
+                          )}
+                          <Badge className={statusColors[complaint.status]}>
+                            {COMPLAINT_STATUS_LABELS[complaint.status]}
+                          </Badge>
+                        </div>
                       </div>
 
                       <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">

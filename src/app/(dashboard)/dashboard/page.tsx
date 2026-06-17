@@ -57,18 +57,27 @@ async function getOwnerStats(email: string) {
 
 async function getTenantStats(email: string) {
   const supabase = await createClient();
-  const { data: tenant } = await supabase.from('tenants').select('id, rent_amount, move_in_date, lease_end_date').eq('email', email).eq('is_active', true).single();
+  const { data: tenant } = await supabase.from('tenants').select('id, rent_amount, move_in_date, lease_end_date, tenant_type, pg_bed_id').eq('email', email).eq('is_active', true).single();
   
   if (!tenant) return null;
 
   const { data: complaints } = await supabase.from('complaints').select('id, status').eq('tenant_id', tenant.id);
   const comps = complaints || [];
 
+  let pgInfo = null;
+  if (tenant.tenant_type === 'pg' && tenant.pg_bed_id) {
+    const { data: bed } = await supabase.from('pg_beds').select('bed_number, room:pg_rooms(room_number)').eq('id', tenant.pg_bed_id).single();
+    if (bed) {
+      pgInfo = { room: bed.room?.room_number, bed: bed.bed_number };
+    }
+  }
+
   return {
     rentAmount: tenant.rent_amount,
     leaseEnd: tenant.lease_end_date,
     moveIn: tenant.move_in_date,
     openComplaints: comps.filter(c => ['open', 'in_progress'].includes(c.status)).length,
+    pgInfo,
   };
 }
 
@@ -142,7 +151,7 @@ export default async function DashboardPage() {
   const profile = await getUserProfile();
   if (!profile) redirect('/login');
 
-  const stats = profile.role === 'broker' ? await getBrokerStats(profile.id) : null;
+  const stats = (profile.role === 'broker' || profile.role === 'pg_owner') ? await getBrokerStats(profile.id) : null;
   const ownerStats = profile.role === 'owner' ? await getOwnerStats(profile.email || '') : null;
   const tenantStats = profile.role === 'tenant' ? await getTenantStats(profile.email || '') : null;
 
@@ -154,14 +163,14 @@ export default async function DashboardPage() {
           Welcome back, {profile.full_name.split(' ')[0]}
         </h1>
         <p className="text-muted-foreground mt-1.5 text-sm sm:text-base">
-          {profile.role === 'broker' && "Here's what's happening with your properties today."}
+          {(profile.role === 'broker' || profile.role === 'pg_owner') && "Here's what's happening with your properties today."}
           {profile.role === 'owner' && "Here is the summary of your property portfolio."}
           {profile.role === 'tenant' && "Here is your current rental status."}
         </p>
       </div>
 
       {/* Broker Stats Grid */}
-      {stats && profile.role === 'broker' && (
+      {stats && (profile.role === 'broker' || profile.role === 'pg_owner') && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 stagger-children">
           {statCards.map((card) => {
             const Icon = card.icon;
@@ -192,7 +201,7 @@ export default async function DashboardPage() {
       )}
 
       {/* Broker Quick actions */}
-      {profile.role === 'broker' && (
+      {(profile.role === 'broker' || profile.role === 'pg_owner') && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 stagger-children">
           {quickActions.map((action) => {
             const Icon = action.icon;
@@ -266,6 +275,22 @@ export default async function DashboardPage() {
       {/* Tenant Dashboard */}
       {profile.role === 'tenant' && tenantStats && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 stagger-children">
+          {tenantStats.pgInfo && (
+            <Card className="border-border/50 bg-gradient-to-br from-background to-purple-500/5 md:col-span-3">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground font-medium flex items-center gap-2">
+                  Your PG Allocation
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                  Room {tenantStats.pgInfo.room} • Bed {tenantStats.pgInfo.bed}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Check the sidebar for your Food Menu and PG Rules.</p>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="border-border/50 bg-gradient-to-br from-background to-emerald-500/5">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-muted-foreground font-medium">Monthly Rent</CardTitle>
@@ -301,7 +326,7 @@ export default async function DashboardPage() {
       )}
 
       {/* Broker Recent activity */}
-      {profile.role === 'broker' && (
+      {(profile.role === 'broker' || profile.role === 'pg_owner') && (
         <Card className="border-border/50 animate-fade-in">
           <CardHeader>
             <CardTitle className="text-base sm:text-lg flex items-center gap-2">

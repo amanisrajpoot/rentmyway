@@ -62,6 +62,11 @@ export function PropertyForm({ owners: initialOwners, property }: PropertyFormPr
     preferred_tenant: (property?.preferred_tenant || 'any') as PreferredTenant,
     description: property?.description || '',
     images: property?.images || [] as string[],
+    pg_brand_name: property?.pg_brand_name || '',
+    pg_logo_url: property?.pg_logo_url || '',
+    pg_tagline: property?.pg_tagline || '',
+    gender_preference: property?.gender_preference || 'coed',
+    meal_plan_included: property?.meal_plan_included ?? false,
   });
 
   const update = (field: string, value: string | boolean | null | string[]) => {
@@ -96,6 +101,11 @@ export function PropertyForm({ owners: initialOwners, property }: PropertyFormPr
         facing: form.facing || null,
         description: form.description || null,
         images: form.images.length > 0 ? form.images : null,
+        pg_brand_name: form.pg_brand_name || null,
+        pg_logo_url: form.pg_logo_url || null,
+        pg_tagline: form.pg_tagline || null,
+        gender_preference: form.gender_preference || null,
+        meal_plan_included: form.meal_plan_included,
       };
 
       if (property) {
@@ -245,6 +255,77 @@ export function PropertyForm({ owners: initialOwners, property }: PropertyFormPr
                 </SelectContent>
               </Select>
             </div>
+            
+            {form.property_type === 'pg' && (
+              <>
+                <div className="col-span-1 sm:col-span-2 bg-primary/10 border border-primary/20 p-4 rounded-lg flex items-start gap-3 mt-2">
+                  <Building2 className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-primary">PG Property Selected</p>
+                    <p className="text-xs text-primary/80 mt-1">Once you create this property, you can manage rooms, beds, food menus, and PG rules from the "PG Operations" section in the sidebar.</p>
+                  </div>
+                </div>
+
+                <div className="col-span-1 sm:col-span-2 mt-4 space-y-4 border-t pt-4">
+                  <h4 className="font-semibold text-sm">PG Specific Details</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Gender Preference</Label>
+                      <Select value={form.gender_preference} onValueChange={(v) => update('gender_preference', v)}>
+                        <SelectTrigger className="bg-background/50 w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="boys">Boys Only</SelectItem>
+                          <SelectItem value="girls">Girls Only</SelectItem>
+                          <SelectItem value="coed">Co-ed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-2 mt-6">
+                      <Switch
+                        checked={form.meal_plan_included}
+                        onCheckedChange={(v) => update('meal_plan_included', v)}
+                      />
+                      <Label className="text-sm">Meal Plan Included in Rent</Label>
+                    </div>
+                  </div>
+
+                  <h4 className="font-semibold text-sm mt-6">PG Branding (For Public Microsite & Business Cards)</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Brand Name</Label>
+                        <Input
+                          value={form.pg_brand_name}
+                          onChange={(e) => update('pg_brand_name', e.target.value)}
+                          placeholder="e.g., Stanza Living"
+                          className="bg-background/50"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Tagline</Label>
+                        <Input
+                          value={form.pg_tagline}
+                          onChange={(e) => update('pg_tagline', e.target.value)}
+                          placeholder="e.g., Your home away from home"
+                          className="bg-background/50"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Brand Logo</Label>
+                      <MediaUploader
+                        value={form.pg_logo_url ? [form.pg_logo_url] : []}
+                        onChange={(urls) => update('pg_logo_url', urls[0] || '')}
+                        maxFiles={1}
+                        acceptedTypes="image/*"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="space-y-2">
               <Label>Furnishing *</Label>

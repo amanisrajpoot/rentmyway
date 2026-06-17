@@ -2,7 +2,7 @@
 // RentMyWay — Database Types
 // ============================================
 
-export type UserRole = 'broker' | 'owner' | 'tenant';
+export type UserRole = 'broker' | 'owner' | 'tenant' | 'pg_owner';
 
 export type PropertyStatus = 'draft' | 'available' | 'rented';
 export type PropertyType = '1bhk' | '2bhk' | '3bhk' | '4bhk' | 'studio' | 'villa' | 'independent_house' | 'pg';
@@ -39,6 +39,13 @@ export type NotificationType =
   | 'lease_expiring' | 'lease_renewed' | 'lease_created'
   | 'maintenance_scheduled' | 'maintenance_completed'
   | 'announcement' | 'document_uploaded' | 'move_out' | 'general';
+
+export type PgRoomType = 'single' | 'double' | 'triple' | 'dormitory';
+export type PgBedStatus = 'vacant' | 'occupied' | 'reserved' | 'maintenance';
+export type MealType = 'breakfast' | 'lunch' | 'snack' | 'dinner';
+export type PgRuleType = 'entry_time' | 'exit_time' | 'guest_policy' | 'smoking' | 'alcohol' | 'noise' | 'food' | 'other';
+export type RefundPolicy = 'full' | 'partial' | 'none';
+export type TenantType = 'regular' | 'pg';
 
 // ============================================
 // Table Row Types
@@ -93,6 +100,11 @@ export interface Property {
   preferred_tenant: PreferredTenant | null;
   description: string | null;
   images: string[] | null;
+  pg_brand_name: string | null;
+  pg_logo_url: string | null;
+  pg_tagline: string | null;
+  gender_preference: string | null;
+  meal_plan_included: boolean | null;
   created_at: string;
   updated_at: string;
   // Joined
@@ -159,6 +171,8 @@ export interface Tenant {
   is_active: boolean;
   kyc_token: string | null;
   kyc_token_expiry: string | null;
+  pg_bed_id: string | null;
+  tenant_type: TenantType;
   created_at: string;
   updated_at: string;
   // Joined
@@ -208,6 +222,8 @@ export interface Complaint {
   tenant_feedback: string | null;
   sla_response_hours: number;
   sla_resolution_hours: number;
+  auto_delegated: boolean;
+  delegated_team_id: string | null;
   created_at: string;
   updated_at: string;
   // Joined
@@ -495,19 +511,109 @@ export interface Enquiry {
   property?: Property;
 }
 
+export interface PgRoom {
+  id: string;
+  property_id: string;
+  broker_id: string;
+  room_number: string;
+  room_type: PgRoomType;
+  floor_number: number | null;
+  total_beds: number;
+  occupied_beds: number;
+  rent_per_bed: number;
+  deposit_per_bed: number;
+  amenities: string[] | null;
+  images: string[] | null;
+  is_active: boolean;
+  created_at: string;
+  // Joined
+  property?: Property;
+  beds?: PgBed[];
+}
+
+export interface PgBed {
+  id: string;
+  room_id: string;
+  bed_number: string;
+  tenant_id: string | null;
+  status: PgBedStatus;
+  rent_override: number | null;
+  created_at: string;
+  // Joined
+  room?: PgRoom;
+  tenant?: Tenant;
+}
+
+export interface PgFoodMenu {
+  id: string;
+  property_id: string;
+  broker_id: string;
+  day_of_week: number;
+  meal_type: MealType;
+  menu_items: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface PgRule {
+  id: string;
+  property_id: string;
+  broker_id: string;
+  rule_type: PgRuleType;
+  title: string;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface PgMaintenanceTeam {
+  id: string;
+  property_id: string;
+  broker_id: string;
+  team_name: string;
+  category: ComplaintCategory;
+  contact_name: string | null;
+  contact_phone: string;
+  email: string | null;
+  is_active: boolean;
+  priority_order: number;
+  created_at: string;
+}
+
+export interface PgNoticePeriod {
+  id: string;
+  property_id: string;
+  broker_id: string;
+  notice_days: number;
+  refund_policy: RefundPolicy;
+  refund_percentage: number | null;
+  early_exit_penalty: number;
+  is_active: boolean;
+  created_at: string;
+}
+
 
 
 // ============================================
 // Insert / Update Types
 // ============================================
 
-export type PropertyInsert = Omit<Property, 'id' | 'created_at' | 'updated_at' | 'owner' | 'tenant'>;
+export type PropertyInsert = Omit<Property, 'id' | 'created_at' | 'updated_at' | 'owner' | 'tenant' | 'pg_brand_name' | 'pg_logo_url' | 'pg_tagline' | 'gender_preference' | 'meal_plan_included'> & {
+  pg_brand_name?: string | null;
+  pg_logo_url?: string | null;
+  pg_tagline?: string | null;
+  gender_preference?: string | null;
+  meal_plan_included?: boolean | null;
+};
 export type PropertyUpdate = Partial<PropertyInsert>;
 
 export type LeadInsert = Omit<Lead, 'id' | 'created_at' | 'updated_at'>;
 export type LeadUpdate = Partial<LeadInsert>;
 
-export type TenantInsert = Omit<Tenant, 'id' | 'created_at' | 'updated_at' | 'property' | 'documents'>;
+export type TenantInsert = Omit<Tenant, 'id' | 'created_at' | 'updated_at' | 'property' | 'documents' | 'pg_bed_id' | 'tenant_type'> & {
+  pg_bed_id?: string | null;
+  tenant_type?: TenantType;
+};
 export type TenantUpdate = Partial<TenantInsert>;
 
 export type UtilityInsert = Omit<Utility, 'id' | 'created_at'>;
@@ -551,6 +657,8 @@ export type ComplaintInsert = Omit<Complaint,
   tenant_feedback?: string | null;
   sla_response_hours?: number;
   sla_resolution_hours?: number;
+  auto_delegated?: boolean;
+  delegated_team_id?: string | null;
 };
 export type ComplaintUpdate = Partial<ComplaintInsert>;
 
@@ -594,6 +702,48 @@ export type EnquiryInsert = Omit<Enquiry, 'id' | 'created_at' | 'property' | 'st
   source?: string;
 };
 export type EnquiryUpdate = Partial<EnquiryInsert>;
+
+export type PgRoomInsert = Omit<PgRoom, 'id' | 'created_at' | 'property' | 'beds' | 'occupied_beds' | 'amenities' | 'images' | 'floor_number' | 'is_active'> & {
+  occupied_beds?: number;
+  amenities?: string[] | null;
+  images?: string[] | null;
+  floor_number?: number | null;
+  is_active?: boolean;
+};
+export type PgRoomUpdate = Partial<PgRoomInsert>;
+
+export type PgBedInsert = Omit<PgBed, 'id' | 'created_at' | 'room' | 'tenant' | 'tenant_id' | 'status' | 'rent_override'> & {
+  tenant_id?: string | null;
+  status?: PgBedStatus;
+  rent_override?: number | null;
+};
+export type PgBedUpdate = Partial<PgBedInsert>;
+
+export type PgFoodMenuInsert = Omit<PgFoodMenu, 'id' | 'created_at' | 'is_active'> & {
+  is_active?: boolean;
+};
+export type PgFoodMenuUpdate = Partial<PgFoodMenuInsert>;
+
+export type PgRuleInsert = Omit<PgRule, 'id' | 'created_at' | 'description' | 'is_active'> & {
+  description?: string | null;
+  is_active?: boolean;
+};
+export type PgRuleUpdate = Partial<PgRuleInsert>;
+
+export type PgMaintenanceTeamInsert = Omit<PgMaintenanceTeam, 'id' | 'created_at' | 'contact_name' | 'email' | 'is_active' | 'priority_order'> & {
+  contact_name?: string | null;
+  email?: string | null;
+  is_active?: boolean;
+  priority_order?: number;
+};
+export type PgMaintenanceTeamUpdate = Partial<PgMaintenanceTeamInsert>;
+
+export type PgNoticePeriodInsert = Omit<PgNoticePeriod, 'id' | 'created_at' | 'refund_percentage' | 'early_exit_penalty' | 'is_active'> & {
+  refund_percentage?: number | null;
+  early_exit_penalty?: number;
+  is_active?: boolean;
+};
+export type PgNoticePeriodUpdate = Partial<PgNoticePeriodInsert>;
 
 // ============================================
 // UI Helper Types
@@ -723,4 +873,25 @@ export const MOVE_OUT_STATUS_LABELS: Record<MoveOutStatus, string> = {
   inspection_scheduled: 'Inspection Scheduled',
   completed: 'Completed',
   cancelled: 'Cancelled',
+};
+
+export const PG_ROOM_TYPE_LABELS: Record<PgRoomType, string> = {
+  single: 'Single',
+  double: 'Double',
+  triple: 'Triple',
+  dormitory: 'Dormitory',
+};
+
+export const PG_BED_STATUS_LABELS: Record<PgBedStatus, string> = {
+  vacant: 'Vacant',
+  occupied: 'Occupied',
+  reserved: 'Reserved',
+  maintenance: 'Maintenance',
+};
+
+export const MEAL_TYPE_LABELS: Record<MealType, string> = {
+  breakfast: 'Breakfast',
+  lunch: 'Lunch',
+  snack: 'Snacks',
+  dinner: 'Dinner',
 };

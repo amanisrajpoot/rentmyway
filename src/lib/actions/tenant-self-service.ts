@@ -34,6 +34,31 @@ export async function getMoveOutRequests() {
 
 export async function createMoveOutRequest(data: MoveOutRequestInsert) {
   const supabase = await createClient();
+
+  // Smart Automation: Notice Period Penalty for PG Tenants
+  try {
+    const { data: tenant } = await supabase.from('tenants').select('tenant_type, property_id').eq('id', data.tenant_id).single();
+    if (tenant?.tenant_type === 'pg') {
+      const { data: noticePolicy } = await supabase.from('pg_notice_periods').select('*').eq('property_id', tenant.property_id).eq('is_active', true).single();
+      
+      if (noticePolicy) {
+        const requestedDate = new Date(data.requested_date);
+        const noticeDate = new Date(data.notice_served_date || new Date().toISOString());
+        
+        const diffTime = requestedDate.getTime() - noticeDate.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays < noticePolicy.notice_days && noticePolicy.early_exit_penalty > 0) {
+          data.deductions = (data.deductions || 0) + noticePolicy.early_exit_penalty;
+          const note = `[Automated] ₹${noticePolicy.early_exit_penalty} deducted due to notice period violation (Served ${diffDays} days notice, required ${noticePolicy.notice_days} days).`;
+          data.broker_notes = data.broker_notes ? `${data.broker_notes}\n${note}` : note;
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error applying smart automation:', err);
+  }
+
   const { error } = await supabase.from('move_out_requests').insert(data);
   if (error) return { error: error.message };
   revalidatePath('/dashboard');

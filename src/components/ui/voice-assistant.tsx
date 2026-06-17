@@ -18,7 +18,10 @@ export function VoiceAssistant({ formType, onParsed, className }: VoiceAssistant
   
   const recognitionRef = useRef<any>(null);
 
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
+    setMounted(true);
     // Initialize Web Speech API
     if (typeof window !== 'undefined') {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -47,7 +50,6 @@ export function VoiceAssistant({ formType, onParsed, className }: VoiceAssistant
         recognitionRef.current.onend = () => {
           setIsRecording(false);
         };
-      } else {
       }
     }
   }, []);
@@ -106,12 +108,11 @@ export function VoiceAssistant({ formType, onParsed, className }: VoiceAssistant
     }
   };
 
-  if (!recognitionRef.current && typeof window !== 'undefined') {
-    return null; // Don't render if not supported
-  }
+  if (!mounted) return null;
+  if (!recognitionRef.current) return null;
 
   return (
-    <div className={`flex flex-col items-end gap-2 ${className}`}>
+    <div className={`flex flex-col items-end gap-2 ${className || ''}`}>
       <div className="flex items-center gap-2">
         {isRecording && (
           <span className="text-xs text-primary animate-pulse bg-primary/10 px-2 py-1 rounded-full flex items-center gap-1.5">

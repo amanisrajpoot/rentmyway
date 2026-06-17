@@ -5,6 +5,7 @@ import { getUserProfile } from '@/lib/actions/auth';
 import { logActivity } from './activity-log';
 import { revalidatePath } from 'next/cache';
 import type { ComplaintInsert, ComplaintStatus } from '@/types/database';
+import { getTeamForCategory } from './pg-teams';
 
 export async function getComplaints(filters?: {
   status?: string;
@@ -106,9 +107,35 @@ export async function createComplaint(data: ComplaintInsert) {
   const profile = await getUserProfile();
   if (!profile) throw new Error('Not authenticated');
 
+  // Check if PG property for auto-delegation
+  const { data: property } = await supabase
+    .from('properties')
+    .select('property_type')
+    .eq('id', data.property_id)
+    .single();
+
+  let assigned_to = data.assigned_to;
+  let assigned_phone = data.assigned_phone;
+  let auto_delegated = false;
+  let delegated_team_id = null;
+
+  if (property?.property_type === 'pg' && data.category) {
+    const team = await getTeamForCategory(data.property_id, data.category);
+    if (team) {
+      assigned_to = team.contact_name || team.team_name;
+      assigned_phone = team.contact_phone;
+      auto_delegated = true;
+      delegated_team_id = team.id;
+    }
+  }
+
   const { data: complaint, error } = await supabase.from('complaints').insert({
     ...data,
     broker_id: data.broker_id || profile.id,
+    assigned_to,
+    assigned_phone,
+    auto_delegated,
+    delegated_team_id,
   }).select().single();
 
   if (error) return { error: error.message };
@@ -118,7 +145,7 @@ export async function createComplaint(data: ComplaintInsert) {
     action: 'Logged Complaint',
     entity_type: 'complaint',
     entity_id: complaint.id,
-    details: { title: data.title, category: data.category, property_id: data.property_id },
+    details: { title: data.title, category: data.category, property_id: data.property_id, auto_delegated },
   });
 
   revalidatePath('/complaints');

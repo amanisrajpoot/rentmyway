@@ -15,7 +15,12 @@ import {
   Wallet,
   Megaphone,
   BarChart3,
-  PieChart
+  PieChart,
+  Bed,
+  Utensils,
+  ShieldAlert,
+  UsersRound,
+  Globe,
 } from 'lucide-react';
 import { type UserRole } from '@/types/database';
 
@@ -40,13 +45,13 @@ export const navConfig: NavGroup[] = [
         title: 'Dashboard',
         href: '/dashboard',
         icon: LayoutDashboard,
-        roles: ['broker', 'owner', 'tenant'],
+        roles: ['broker', 'owner', 'tenant', 'pg_owner'],
       },
       {
         title: 'Analytics',
         href: '/analytics',
         icon: BarChart3,
-        roles: ['broker', 'owner'],
+        roles: ['broker', 'owner', 'pg_owner'],
       },
     ],
   },
@@ -162,7 +167,7 @@ export const navConfig: NavGroup[] = [
         title: 'Complaints',
         href: '/complaints',
         icon: MessageSquareWarning,
-        roles: ['broker', 'owner', 'tenant'],
+        roles: ['broker', 'owner', 'tenant', 'pg_owner'],
       },
       {
         title: 'Announcements',
@@ -185,19 +190,60 @@ export const navConfig: NavGroup[] = [
     ],
   },
   {
+    label: 'PG Operations',
+    items: [
+      {
+        title: 'Rooms & Beds',
+        href: '/pg/rooms',
+        icon: Bed,
+        roles: ['broker', 'pg_owner'],
+      },
+      {
+        title: 'Food Menu',
+        href: '/pg/food-menu',
+        icon: Utensils,
+        roles: ['broker', 'pg_owner', 'tenant'],
+      },
+      {
+        title: 'Rules & Policies',
+        href: '/pg/rules',
+        icon: ShieldAlert,
+        roles: ['broker', 'pg_owner', 'tenant'],
+      },
+      {
+        title: 'Maintenance Teams',
+        href: '/pg/teams',
+        icon: Wrench,
+        roles: ['broker', 'pg_owner'],
+      },
+      {
+        title: 'Bulk Onboarding',
+        href: '/pg/onboarding',
+        icon: UsersRound,
+        roles: ['broker', 'pg_owner'],
+      },
+      {
+        title: 'Marketing & Branding',
+        href: '/pg/marketing',
+        icon: Globe,
+        roles: ['broker', 'pg_owner'],
+      },
+    ],
+  },
+  {
     label: 'System',
     items: [
       {
         title: 'Notifications',
         href: '/notifications',
         icon: Bell,
-        roles: ['broker', 'owner', 'tenant'],
+        roles: ['broker', 'owner', 'tenant', 'pg_owner'],
       },
       {
         title: 'Settings',
         href: '/settings',
         icon: Settings,
-        roles: ['broker', 'owner', 'tenant'],
+        roles: ['broker', 'owner', 'tenant', 'pg_owner'],
       },
     ],
   },
