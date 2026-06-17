@@ -1,19 +1,29 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { bulkOnboardTenants } from '@/lib/actions/pg-onboarding';
+import { getPgRooms } from '@/lib/actions/pg-rooms';
 import { Loader2, UsersRound, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { Property } from '@/types/database';
+import type { Property, PgRoom } from '@/types/database';
 
 export function OnboardingClient({ properties }: { properties: Property[] }) {
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>(properties[0]?.id || '');
   const [loading, setLoading] = useState(false);
+  const [rooms, setRooms] = useState<PgRoom[]>([]);
 
+  useEffect(() => {
+    if (selectedPropertyId) loadRooms(selectedPropertyId);
+  }, [selectedPropertyId]);
+
+  async function loadRooms(propId: string) {
+    const { data } = await getPgRooms(propId);
+    setRooms(data as any || []);
+  }
 
   const [rows, setRows] = useState([
     { id: 1, name: '', phone: '', room_id: '', bed_number: '', rent_amount: '', deposit_amount: '', move_in_date: new Date().toISOString().split('T')[0] }
@@ -63,7 +73,9 @@ export function OnboardingClient({ properties }: { properties: Property[] }) {
       <div className="flex items-center justify-between">
         <Select value={selectedPropertyId} onValueChange={(val: any) => setSelectedPropertyId(val)}>
           <SelectTrigger className="w-[300px]">
-            <SelectValue placeholder="Select Property" />
+            <SelectValue placeholder="Select Property">
+              {properties.find(p => p.id === selectedPropertyId)?.title || "Select Property"}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>)}
@@ -79,7 +91,7 @@ export function OnboardingClient({ properties }: { properties: Property[] }) {
                 <tr>
                   <th className="px-4 py-3 font-medium">Name</th>
                   <th className="px-4 py-3 font-medium">Phone</th>
-                  <th className="px-4 py-3 font-medium">Room ID</th>
+                  <th className="px-4 py-3 font-medium">Room</th>
                   <th className="px-4 py-3 font-medium">Bed (A/B..)</th>
                   <th className="px-4 py-3 font-medium">Rent</th>
                   <th className="px-4 py-3 font-medium">Deposit</th>
@@ -91,7 +103,24 @@ export function OnboardingClient({ properties }: { properties: Property[] }) {
                   <tr key={row.id} className="border-b last:border-0 hover:bg-muted/30">
                     <td className="px-4 py-2"><Input value={row.name} onChange={e => updateRow(row.id, 'name', e.target.value)} placeholder="Tenant Name" className="h-8" /></td>
                     <td className="px-4 py-2"><Input value={row.phone} onChange={e => updateRow(row.id, 'phone', e.target.value)} placeholder="Phone" className="h-8" /></td>
-                    <td className="px-4 py-2"><Input value={row.room_id} onChange={e => updateRow(row.id, 'room_id', e.target.value)} placeholder="Room UUID" className="h-8" /></td>
+                    <td className="px-4 py-2">
+                      <Select value={row.room_id} onValueChange={v => updateRow(row.id, 'room_id', v || '')}>
+                        <SelectTrigger className="h-8 min-w-[140px]">
+                          <SelectValue placeholder="Select Room" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {rooms.length === 0 ? (
+                            <SelectItem value="none" disabled>No rooms found</SelectItem>
+                          ) : (
+                            rooms.map(r => (
+                              <SelectItem key={r.id} value={r.id}>
+                                Room {r.room_number} ({r.room_type})
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </td>
                     <td className="px-4 py-2"><Input value={row.bed_number} onChange={e => updateRow(row.id, 'bed_number', e.target.value)} placeholder="e.g. A" className="h-8 w-20" /></td>
                     <td className="px-4 py-2"><Input type="number" value={row.rent_amount} onChange={e => updateRow(row.id, 'rent_amount', e.target.value)} placeholder="Amount" className="h-8 w-24" /></td>
                     <td className="px-4 py-2"><Input type="number" value={row.deposit_amount} onChange={e => updateRow(row.id, 'deposit_amount', e.target.value)} placeholder="Deposit" className="h-8 w-24" /></td>

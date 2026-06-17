@@ -199,6 +199,12 @@ export const navConfig: NavGroup[] = [
         roles: ['broker', 'pg_owner'],
       },
       {
+        title: 'My Room',
+        href: '/tenant/pg-room',
+        icon: Bed,
+        roles: ['tenant'],
+      },
+      {
         title: 'Food Menu',
         href: '/pg/food-menu',
         icon: Utensils,
@@ -213,6 +219,18 @@ export const navConfig: NavGroup[] = [
       {
         title: 'Maintenance Teams',
         href: '/pg/teams',
+        icon: Wrench,
+        roles: ['broker', 'pg_owner'],
+      },
+      {
+        title: 'Service Requests',
+        href: '/tenant/service-requests',
+        icon: Wrench,
+        roles: ['tenant'],
+      },
+      {
+        title: 'Service Requests',
+        href: '/pg/service-requests',
         icon: Wrench,
         roles: ['broker', 'pg_owner'],
       },

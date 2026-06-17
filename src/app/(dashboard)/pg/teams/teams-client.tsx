@@ -4,14 +4,20 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { getMaintenanceTeams } from '@/lib/actions/pg-teams';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { getMaintenanceTeams, createMaintenanceTeam } from '@/lib/actions/pg-teams';
 import { Loader2, Wrench, Phone, Mail } from 'lucide-react';
+import { toast } from 'sonner';
 import type { Property, PgMaintenanceTeam } from '@/types/database';
 
 export function TeamsClient({ properties }: { properties: Property[] }) {
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>(properties[0]?.id || '');
   const [teams, setTeams] = useState<PgMaintenanceTeam[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [addLoading, setAddLoading] = useState(false);
 
   useEffect(() => {
     if (selectedPropertyId) loadTeams(selectedPropertyId);
@@ -24,6 +30,30 @@ export function TeamsClient({ properties }: { properties: Property[] }) {
     setLoading(false);
   }
 
+  async function handleAddTeam(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setAddLoading(true);
+    const formData = new FormData(e.currentTarget);
+    
+    const result = await createMaintenanceTeam({
+      property_id: selectedPropertyId,
+      team_name: formData.get('team_name') as string,
+      category: formData.get('category') as string,
+      contact_name: (formData.get('contact_name') as string) || null,
+      contact_phone: formData.get('contact_phone') as string,
+      email: (formData.get('email') as string) || null,
+    } as any);
+
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success('Maintenance team added successfully');
+      setIsAddDialogOpen(false);
+      loadTeams(selectedPropertyId);
+    }
+    setAddLoading(false);
+  }
+
   if (properties.length === 0) return <div className="text-center py-10 text-muted-foreground">No PG properties found.</div>;
 
   return (
@@ -31,13 +61,15 @@ export function TeamsClient({ properties }: { properties: Property[] }) {
       <div className="flex items-center justify-between">
         <Select value={selectedPropertyId} onValueChange={(val: any) => setSelectedPropertyId(val)}>
           <SelectTrigger className="w-[300px]">
-            <SelectValue placeholder="Select Property" />
+            <SelectValue placeholder="Select Property">
+              {properties.find(p => p.id === selectedPropertyId)?.title || "Select Property"}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Button>Add Team</Button>
+        <Button onClick={() => setIsAddDialogOpen(true)}>Add Team</Button>
       </div>
 
       {loading ? (
@@ -78,6 +110,55 @@ export function TeamsClient({ properties }: { properties: Property[] }) {
           ))}
         </div>
       )}
+
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Maintenance Team</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleAddTeam} className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label>Team / Vendor Name</Label>
+              <Input name="team_name" placeholder="e.g. Quick Fix Plumbers" required />
+            </div>
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select name="category" defaultValue="plumbing">
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="plumbing">Plumbing</SelectItem>
+                  <SelectItem value="electrical">Electrical</SelectItem>
+                  <SelectItem value="cleaning">Cleaning</SelectItem>
+                  <SelectItem value="carpentry">Carpentry</SelectItem>
+                  <SelectItem value="it_network">IT / Network</SelectItem>
+                  <SelectItem value="general">General Maintenance</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Contact Name (Optional)</Label>
+                <Input name="contact_name" placeholder="e.g. Ramesh" />
+              </div>
+              <div className="space-y-2">
+                <Label>Phone Number</Label>
+                <Input name="contact_phone" placeholder="10-digit number" required />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Email (Optional)</Label>
+              <Input name="email" type="email" placeholder="vendor@example.com" />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={addLoading}>
+                {addLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Add Team
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

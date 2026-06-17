@@ -16,6 +16,15 @@ export type FollowUpType = 'call' | 'whatsapp' | 'email' | 'site_visit' | 'meeti
 
 export type DocumentType = 'aadhaar' | 'pan' | 'passport' | 'driving_license' | 'rent_agreement' | 'other';
 
+export type NotificationType =
+  | 'rent_due' | 'rent_overdue' | 'rent_paid'
+  | 'complaint_created' | 'complaint_updated' | 'complaint_resolved'
+  | 'lease_expiring' | 'lease_renewed' | 'lease_created'
+  | 'maintenance_scheduled' | 'maintenance_completed'
+  | 'announcement' | 'document_uploaded' | 'move_out' | 'general';
+export type AnnouncementPriority = 'low' | 'normal' | 'high' | 'urgent';
+export type ServiceRequestCategory = 'room_cleaning' | 'laundry' | 'guest_entry' | 'wifi_issue' | 'food_complaint' | 'water_issue' | 'ac_repair' | 'furniture_repair' | 'key_duplicate' | 'other';
+export type ServiceRequestStatus = 'pending' | 'in_progress' | 'completed' | 'rejected';
 export type ComplaintStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
 export type ComplaintPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type ComplaintCategory = 'plumbing' | 'electrical' | 'carpentry' | 'painting' | 'pest_control' | 'appliance' | 'structural' | 'cleaning' | 'security' | 'other';
@@ -32,13 +41,6 @@ export type BillStatus = 'pending' | 'paid' | 'overdue';
 export type BillPaidBy = 'tenant' | 'owner' | 'broker';
 
 export type PayoutStatus = 'pending' | 'paid';
-
-export type NotificationType =
-  | 'rent_due' | 'rent_overdue' | 'rent_paid'
-  | 'complaint_created' | 'complaint_updated' | 'complaint_resolved'
-  | 'lease_expiring' | 'lease_renewed' | 'lease_created'
-  | 'maintenance_scheduled' | 'maintenance_completed'
-  | 'announcement' | 'document_uploaded' | 'move_out' | 'general';
 
 export type PgRoomType = 'single' | 'double' | 'triple' | 'dormitory';
 export type PgBedStatus = 'vacant' | 'occupied' | 'reserved' | 'maintenance';
@@ -566,6 +568,23 @@ export interface PgRule {
   created_at: string;
 }
 
+export interface PgServiceRequest {
+  id: string;
+  tenant_id: string;
+  property_id: string;
+  broker_id: string;
+  category: ServiceRequestCategory;
+  description: string | null;
+  urgency: 'normal' | 'urgent';
+  status: ServiceRequestStatus;
+  resolution_notes: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined
+  tenant?: Tenant;
+  property?: Property;
+}
+
 export interface PgMaintenanceTeam {
   id: string;
   property_id: string;
@@ -723,6 +742,9 @@ export type PgFoodMenuInsert = Omit<PgFoodMenu, 'id' | 'created_at' | 'is_active
   is_active?: boolean;
 };
 export type PgFoodMenuUpdate = Partial<PgFoodMenuInsert>;
+
+export type PgServiceRequestInsert = Omit<PgServiceRequest, 'id' | 'created_at' | 'updated_at' | 'tenant' | 'property'>;
+export type PgServiceRequestUpdate = Partial<PgServiceRequestInsert>;
 
 export type PgRuleInsert = Omit<PgRule, 'id' | 'created_at' | 'description' | 'is_active'> & {
   description?: string | null;

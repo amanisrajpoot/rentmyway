@@ -83,3 +83,74 @@ export async function bulkOnboardTenants(tenants: (TenantInsert & { bed_number: 
   
   return { success: true, count: successCount, errors: errors.length > 0 ? errors : undefined };
 }
+
+export async function onboardSinglePgTenant(data: {
+  property_id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  room_id: string;
+  bed_id: string;
+  rent_amount: number;
+  deposit_amount: number;
+  move_in_date: string;
+}) {
+  const supabase = await createClient();
+  const profile = await getUserProfile();
+  if (!profile) return { error: 'Not authenticated' };
+
+  // 1. Verify bed is vacant
+  const { data: bed, error: bedErr } = await supabase
+    .from('pg_beds')
+    .select('id, status, room_id')
+    .eq('id', data.bed_id)
+    .single();
+
+  if (bedErr || !bed) return { error: 'Bed not found' };
+  if (bed.status === 'occupied') return { error: 'Bed is already occupied' };
+
+  // 2. Insert tenant
+  const { data: newTenant, error: tenantErr } = await supabase
+    .from('tenants')
+    .insert({
+      broker_id: profile.id,
+      property_id: data.property_id,
+      name: data.name,
+      phone: data.phone,
+      email: data.email || null,
+      rent_amount: data.rent_amount,
+      deposit_amount: data.deposit_amount,
+      move_in_date: data.move_in_date,
+      is_active: true,
+      tenant_type: 'pg',
+      pg_bed_id: bed.id,
+    })
+    .select()
+    .single();
+
+  if (tenantErr) return { error: `Failed to create tenant: ${tenantErr.message}` };
+
+  // 3. Update bed status
+  await supabase
+    .from('pg_beds')
+    .update({ tenant_id: newTenant.id, status: 'occupied' })
+    .eq('id', bed.id);
+
+  // 4. Update room occupancy
+  const { data: occupiedBeds } = await supabase.from('pg_beds').select('id').eq('room_id', bed.room_id).eq('status', 'occupied');
+  await supabase.from('pg_rooms').update({ occupied_beds: occupiedBeds?.length || 0 }).eq('id', bed.room_id);
+
+  await logActivity({
+    user_id: profile.id,
+    action: 'Onboarded Single PG Tenant',
+    entity_type: 'tenant',
+    entity_id: newTenant.id,
+    details: { name: newTenant.name, property_id: data.property_id },
+  });
+
+  revalidatePath('/pg/onboarding');
+  revalidatePath('/pg/rooms');
+  revalidatePath('/tenants');
+
+  return { success: true, data: newTenant };
+}

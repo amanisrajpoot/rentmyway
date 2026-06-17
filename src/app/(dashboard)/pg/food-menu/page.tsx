@@ -8,12 +8,22 @@ export default async function FoodMenuPage() {
   const profile = await getUserProfile();
   if (!profile) redirect('/login');
 
-  const { data: properties } = await getProperties({ type: 'pg' });
+  let propertiesData = [];
+  
+  if (profile.role === 'tenant') {
+    const { createClient } = await import('@/lib/supabase/server');
+    const supabase = await createClient();
+    const { data: tenant } = await supabase.from('tenants').select('property:properties(*)').eq('email', profile.email).eq('is_active', true).single();
+    if (tenant?.property) propertiesData = [tenant.property];
+  } else {
+    const { data } = await getProperties({ type: 'pg' });
+    propertiesData = data || [];
+  }
 
   return (
     <PageLayout>
-      <PageHeader title="Food Menu" description="Manage weekly meal plans" />
-      <FoodMenuClient properties={properties as any} />
+      <PageHeader title="Food Menu" description={profile.role === 'tenant' ? 'View your weekly meal plan' : 'Manage weekly meal plans'} />
+      <FoodMenuClient properties={propertiesData as any} readOnly={profile.role === 'tenant'} />
     </PageLayout>
   );
 }

@@ -16,6 +16,18 @@ export default async function TenantPropertyPage() {
 
   const supabase = await createClient();
 
+  // Find active tenant record to check if they are a PG tenant
+  const { data: tenantRecord } = await supabase
+    .from('tenants')
+    .select('tenant_type')
+    .eq('email', profile.email)
+    .eq('is_active', true)
+    .single();
+
+  if (tenantRecord?.tenant_type === 'pg') {
+    redirect('/tenant/pg-room');
+  }
+
   // Find active tenant record by email
   const { data: tenant } = await supabase
     .from('tenants')

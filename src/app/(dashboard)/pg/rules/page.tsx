@@ -8,12 +8,22 @@ export default async function RulesPage() {
   const profile = await getUserProfile();
   if (!profile) redirect('/login');
 
-  const { data: properties } = await getProperties({ type: 'pg' });
+  let propertiesData = [];
+  
+  if (profile.role === 'tenant') {
+    const { createClient } = await import('@/lib/supabase/server');
+    const supabase = await createClient();
+    const { data: tenant } = await supabase.from('tenants').select('property:properties(*)').eq('email', profile.email).eq('is_active', true).single();
+    if (tenant?.property) propertiesData = [tenant.property];
+  } else {
+    const { data } = await getProperties({ type: 'pg' });
+    propertiesData = data || [];
+  }
 
   return (
     <PageLayout>
-      <PageHeader title="Rules & Policies" description="Manage PG rules and notice periods" />
-      <RulesClient properties={properties as any} />
+      <PageHeader title="Rules & Policies" description={profile.role === 'tenant' ? 'View PG rules and notice periods' : 'Manage PG rules and notice periods'} />
+      <RulesClient properties={propertiesData as any} readOnly={profile.role === 'tenant'} />
     </PageLayout>
   );
 }

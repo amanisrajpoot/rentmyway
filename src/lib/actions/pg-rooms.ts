@@ -13,11 +13,25 @@ export async function getPgRooms(propertyId: string) {
 
   let query = supabase
     .from('pg_rooms')
-    .select('*, beds:pg_beds(*, tenant:tenants(id, name, phone, email))')
+    .select('*, beds:pg_beds(*, tenant:tenants!tenant_id(id, name, phone, email))')
     .eq('property_id', propertyId)
     .order('room_number', { ascending: true });
 
   const { data, error } = await query;
+  if (error) return { error: error.message };
+  return { data: data || [] };
+}
+
+export async function getUnassignedTenants(propertyId: string) {
+  const supabase = await createClient();
+  
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('id, name, phone, email')
+    .eq('property_id', propertyId)
+    .is('pg_bed_id', null)
+    .eq('is_active', true);
+
   if (error) return { error: error.message };
   return { data: data || [] };
 }
@@ -125,4 +139,57 @@ export async function vacateBed(bedId: string) {
 
   revalidatePath('/pg/rooms');
   return { success: true };
+}
+
+export async function bulkCreatePgRooms(propertyId: string, roomsData: any[]) {
+  const supabase = await createClient();
+  const profile = await getUserProfile();
+  if (!profile) return { error: 'Not authenticated' };
+
+  const roomsToInsert = roomsData.map(r => ({
+    property_id: propertyId,
+    broker_id: profile.id,
+    room_number: String(r.room_number),
+    room_type: String(r.room_type || 'single').toLowerCase(),
+    total_beds: Number(r.total_beds) || 1,
+    rent_per_bed: Number(r.rent_per_bed) || 0,
+    deposit_per_bed: Number(r.deposit_per_bed) || 0,
+    occupied_beds: 0,
+  }));
+
+  const { data: createdRooms, error: roomsError } = await supabase
+    .from('pg_rooms')
+    .insert(roomsToInsert)
+    .select();
+
+  if (roomsError) return { error: roomsError.message };
+
+  // Generate beds for all created rooms
+  const allBeds: PgBedInsert[] = [];
+  for (const room of createdRooms) {
+    for (let i = 0; i < room.total_beds; i++) {
+      allBeds.push({
+        room_id: room.id,
+        bed_number: String.fromCharCode(65 + i),
+        status: 'vacant',
+      });
+    }
+  }
+
+  if (allBeds.length > 0) {
+    // Insert beds in chunks if too many, but typically < 1000 so one insert is fine
+    const { error: bedsError } = await supabase.from('pg_beds').insert(allBeds);
+    if (bedsError) return { error: bedsError.message };
+  }
+
+  await logActivity({
+    user_id: profile.id,
+    action: 'Bulk Created PG Rooms',
+    entity_type: 'property',
+    entity_id: propertyId,
+    details: { count: createdRooms.length },
+  });
+
+  revalidatePath('/pg/rooms');
+  return { success: true, count: createdRooms.length };
 }
