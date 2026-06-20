@@ -123,14 +123,12 @@ export function BulkImportDialog({
       setOpen(val);
       if (!val) setTimeout(resetState, 200); // reset after animation
     }}>
-      <DialogTrigger>
-        {triggerButton || (
-          <Button variant="outline">
-            <Upload className="h-4 w-4 mr-2" />
-            Bulk Import
-          </Button>
-        )}
-      </DialogTrigger>
+      <DialogTrigger render={(triggerButton as React.ReactElement) || (
+        <Button variant="outline">
+          <Upload className="h-4 w-4 mr-2" />
+          Bulk Import
+        </Button>
+      )} />
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>

@@ -50,12 +50,12 @@ export function PropertyDoctorModal() {
 
   return (
     <Dialog open={open} onOpenChange={(val) => { setOpen(val); if (!val) setTimeout(reset, 200); }}>
-      <DialogTrigger>
+      <DialogTrigger render={
         <Button variant="outline" size="sm" className="bg-purple-500/10 text-purple-500 hover:bg-purple-500/20 hover:text-purple-600 border-purple-500/20">
           <ScanFace className="h-4 w-4 mr-2" />
           Property Doctor™
         </Button>
-      </DialogTrigger>
+      } />
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-purple-600">

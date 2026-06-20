@@ -53,12 +53,12 @@ export function WhatsAppLogDialog({ tenantId, tenantPhone, currentRentAmount }: 
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger>
+      <DialogTrigger render={
         <Button variant="outline" size="sm" className="w-full sm:w-auto bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20 hover:text-[#25D366] border-[#25D366]/20">
           <MessageCircle className="h-4 w-4 mr-2" />
           WhatsApp Logs
         </Button>
-      </DialogTrigger>
+      } />
       <DialogContent className="sm:max-w-lg h-[80vh] flex flex-col">
         <DialogHeader className="pb-4 border-b border-border/50 shrink-0">
           <DialogTitle className="flex items-center gap-2">

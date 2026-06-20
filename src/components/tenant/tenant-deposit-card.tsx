@@ -92,11 +92,11 @@ export function TenantDepositCard({ tenantId, propertyId, baseDepositAmount }: T
           <CardDescription>Current Balance: ₹{currentBalance.toLocaleString('en-IN')}</CardDescription>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger>
+          <DialogTrigger render={
             <Button variant="outline" size="sm" className="h-8">
               <Plus className="h-3.5 w-3.5 mr-1" /> Add
             </Button>
-          </DialogTrigger>
+          } />
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Record Deposit Transaction</DialogTitle>

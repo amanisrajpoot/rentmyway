@@ -61,13 +61,11 @@ export function TenantPaymentHistory({ tenantId, tenantName, trigger }: TenantPa
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger>
-        {trigger || (
+      <DialogTrigger render={(trigger as React.ReactElement) || (
           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
             <History className="h-4 w-4" />
           </Button>
-        )}
-      </DialogTrigger>
+        )} />
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Payment History: {tenantName}</DialogTitle>
