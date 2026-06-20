@@ -15,6 +15,7 @@ import MapViewWrapper from '@/components/ui/map-view-wrapper';
 import { MediaDisplay } from '@/components/ui/media-display';
 import { PropertyGallery } from '@/components/properties/property-gallery';
 import { PropertyRatingCard } from '@/components/properties/property-rating-card';
+import { PropertyDoctorModal } from '@/components/properties/property-doctor-modal';
 import { cn } from '@/lib/utils';
 
 const statusColors: Record<string, string> = {
@@ -191,6 +192,28 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
               </CardContent>
             </Card>
           )}
+
+          {/* Property Health Card */}
+          <Card className="border-border/50">
+            <CardHeader className="flex flex-row justify-between items-center pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                Property Health
+              </CardTitle>
+              <PropertyDoctorModal />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4 mt-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Last Painted</span>
+                  <Badge variant="outline" className="text-amber-500 border-amber-500/20 bg-amber-500/10">Due Soon</Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">AC Service</span>
+                  <Badge variant="outline" className="text-emerald-500 border-emerald-500/20 bg-emerald-500/10">Good</Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Internal Rating */}
           <PropertyRatingCard propertyId={id} />

@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { CopyButton } from '@/components/ui/copy-button';
 import { TenantDepositCard } from '@/components/tenant/tenant-deposit-card';
+import { KirayaScoreGauge } from '@/components/tenant/kiraya-score-gauge';
+import { WhatsAppLogDialog } from '@/components/tenant/whatsapp-log-dialog';
 import { cn } from '@/lib/utils';
 
 export default async function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -60,23 +62,59 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           {/* Contact */}
-          <Card className="border-border/50">
-            <CardHeader>
-              <CardTitle className="text-base">Contact</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-muted-foreground" />
-                <span>{tenant.phone}</span>
-              </div>
-              {tenant.email && (
+          <div className="flex gap-4">
+            <Card className="flex-1 border-border/50">
+              <CardHeader>
+                <CardTitle className="text-base flex justify-between items-center">
+                  Contact
+                  <WhatsAppLogDialog 
+                    tenantId={id} 
+                    tenantPhone={tenant.phone} 
+                    currentRentAmount={tenant.rent_amount} 
+                  />
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span>{tenant.email}</span>
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  <span>{tenant.phone}</span>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+                {tenant.email && (
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span>{tenant.email}</span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="flex-1 border-border/50">
+              <CardHeader>
+                <CardTitle className="text-base flex justify-between items-center">
+                  Tenant Passport
+                  {tenant.police_verification_status === 'verified' && (
+                    <Badge variant="outline" className="text-emerald-500 border-emerald-500/20 bg-emerald-500/10">Police Verified</Badge>
+                  )}
+                  {tenant.police_verification_status !== 'verified' && (
+                    <Badge variant="outline" className="text-amber-500 border-amber-500/20 bg-amber-500/10">Verification Pending</Badge>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {tenant.emergency_contact_details?.name ? (
+                  <>
+                    <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Emergency Contact</div>
+                    <div className="text-sm font-medium">{tenant.emergency_contact_details.name} ({tenant.emergency_contact_details.relation || 'Relative'})</div>
+                    <div className="text-sm flex items-center gap-2 mt-1">
+                      <Phone className="h-3 w-3 text-muted-foreground" /> {tenant.emergency_contact_details.phone}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No emergency contact provided.</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Documents */}
           <Card className="border-border/50">
@@ -147,6 +185,8 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
 
         {/* Sidebar */}
         <div className="space-y-6">
+          <KirayaScoreGauge score={tenant.kiraya_score ?? 800} />
+
           {/* Rent Info */}
           <Card className="border-border/50">
             <CardHeader>

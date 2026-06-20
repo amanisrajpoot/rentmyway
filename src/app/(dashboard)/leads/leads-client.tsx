@@ -162,8 +162,8 @@ export function LeadsClient({ initialLeads, initialSiteVisits, initialFilters }:
   async function handleStageChangeConfirm(data: any) {
     if (!changingLeadId || !targetStage) return;
     try {
-      if (targetStage === 'converted') {
-        const res = await convertLead(changingLeadId, data.propertyId);
+      if (targetStage === 'converted' && data.propertyId) {
+        const res = await convertLead(changingLeadId, data.propertyId, data.rentAmount, data.commissionAmount);
         if ('error' in res && res.error) throw new Error(res.error);
       } else {
         const res = await updateLeadStage(changingLeadId, targetStage);

@@ -29,6 +29,7 @@ export function StageChangeDialog({ open, onOpenChange, leadId, targetStage, onC
   // Dynamic fields
   const [propertyId, setPropertyId] = useState('');
   const [rentAmount, setRentAmount] = useState('');
+  const [commissionAmount, setCommissionAmount] = useState('');
   const [notes, setNotes] = useState('');
   const [visitDate, setVisitDate] = useState('');
 
@@ -36,6 +37,7 @@ export function StageChangeDialog({ open, onOpenChange, leadId, targetStage, onC
     if (open) {
       setPropertyId('');
       setRentAmount('');
+      setCommissionAmount('');
       setNotes('');
       setVisitDate('');
     }
@@ -53,6 +55,7 @@ export function StageChangeDialog({ open, onOpenChange, leadId, targetStage, onC
       } else if (targetStage === 'converted') {
         data.propertyId = propertyId;
         data.rentAmount = Number(rentAmount);
+        data.commissionAmount = Number(commissionAmount || 0);
       }
       
       await onConfirm(data);
@@ -87,14 +90,25 @@ export function StageChangeDialog({ open, onOpenChange, leadId, targetStage, onC
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Final Rent Amount (₹) *</Label>
-                <Input 
-                  type="number" 
-                  required 
-                  value={rentAmount} 
-                  onChange={(e) => setRentAmount(e.target.value)} 
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Final Rent Amount (₹) *</Label>
+                  <Input 
+                    type="number" 
+                    required 
+                    value={rentAmount} 
+                    onChange={(e) => setRentAmount(e.target.value)} 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Brokerage Commission (₹)</Label>
+                  <Input 
+                    type="number" 
+                    value={commissionAmount} 
+                    onChange={(e) => setCommissionAmount(e.target.value)} 
+                    placeholder="e.g. 15000"
+                  />
+                </div>
               </div>
             </>
           )}

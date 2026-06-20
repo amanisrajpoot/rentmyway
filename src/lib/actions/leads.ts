@@ -132,7 +132,7 @@ export async function updateLeadStage(id: string, status: LeadStatus) {
   return { success: true };
 }
 
-export async function convertLead(leadId: string, propertyId: string) {
+export async function convertLead(leadId: string, propertyId: string, rentAmount?: number, commissionAmount?: number) {
   const supabase = await createClient();
   const profile = await getUserProfile();
   if (!profile) return { error: 'Not authenticated' };
@@ -167,7 +167,7 @@ export async function convertLead(leadId: string, propertyId: string) {
     name: lead.name,
     phone: lead.phone,
     email: lead.email,
-    rent_amount: property.rent,
+    rent_amount: rentAmount ?? property.rent,
     deposit_amount: property.deposit,
     move_in_date: lead.move_in_date || new Date().toISOString().split('T')[0],
     is_active: true,
@@ -192,6 +192,29 @@ export async function convertLead(leadId: string, propertyId: string) {
   revalidatePath('/leads');
   revalidatePath('/properties');
   revalidatePath('/tenants');
+
+  // Insert broker commission if provided
+  if (commissionAmount && commissionAmount > 0) {
+    // Get the tenant we just inserted to link the ID
+    const { data: newTenant } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('lead_id', leadId)
+      .single();
+
+    if (newTenant) {
+      await supabase.from('broker_commissions').insert({
+        broker_id: profile.id,
+        tenant_id: newTenant.id,
+        property_id: propertyId,
+        owner_id: property.owner_id,
+        commission_type: 'fixed',
+        commission_value: commissionAmount,
+        computed_amount: commissionAmount,
+        status: 'pending'
+      });
+    }
+  }
 
   await logActivity({
     user_id: profile.id,

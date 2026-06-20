@@ -136,7 +136,7 @@ export const navConfig: NavGroup[] = [
       },
       {
         title: 'Commissions',
-        href: '/commissions',
+        href: '/broker/commissions',
         icon: PieChart,
         roles: ['broker'],
       },
