@@ -12,6 +12,7 @@ import {
   ExternalLink, CheckCircle, AlertCircle,
 } from 'lucide-react';
 import { CopyButton } from '@/components/ui/copy-button';
+import { TenantDepositCard } from '@/components/tenant/tenant-deposit-card';
 import { cn } from '@/lib/utils';
 
 export default async function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -176,6 +177,13 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
               )}
             </CardContent>
           </Card>
+
+          {/* Deposit Management */}
+          <TenantDepositCard 
+            tenantId={id} 
+            propertyId={tenant.property_id} 
+            baseDepositAmount={tenant.deposit_amount} 
+          />
 
           {/* Property */}
           {tenant.property && (

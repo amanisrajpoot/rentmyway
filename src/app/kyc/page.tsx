@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Upload, CheckCircle, AlertCircle, Loader2, FileText, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
+import { AadhaarESignStub } from '@/components/tenant/aadhaar-esign-stub';
 
 interface TenantInfo {
   id: string;
@@ -206,6 +207,17 @@ function KYCUploadContent() {
         <p className="text-center text-xs text-muted-foreground">
           Mandatory: Aadhaar & PAN. Other documents are optional.
         </p>
+
+        {tenant && (
+          <div className="pt-6 border-t border-border/50">
+            <AadhaarESignStub 
+              tenantId={tenant.id} 
+              onSuccess={() => {
+                // Could refresh or show a celebration confetti
+              }} 
+            />
+          </div>
+        )}
       </div>
     </div>
   );

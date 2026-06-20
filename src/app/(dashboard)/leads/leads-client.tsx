@@ -26,6 +26,10 @@ import { InfiniteScroll } from '@/components/ui/infinite-scroll';
 import { exportToCSV } from '@/lib/utils/export';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PageLayout, PageHeader, PageToolbar, PageContent } from '@/components/layout/page-layout';
+import { Checkbox } from '@/components/ui/checkbox';
+import { BulkImportDialog } from '@/components/ui/bulk-import-dialog';
+import { bulkCreateLeads, bulkDeleteLeads } from '@/lib/actions/bulk-leads';
+import { StageChangeDialog } from '@/components/leads/stage-change-dialog';
 
 const stageColors: Record<LeadStatus, string> = {
   new: 'border-t-blue-500',
@@ -79,11 +83,15 @@ export function LeadsClient({ initialLeads, initialSiteVisits, initialFilters }:
   const [draggedOverStage, setDraggedOverStage] = useState<string | null>(null);
   const [isDraggingLeadId, setIsDraggingLeadId] = useState<string | null>(null);
 
-  const [convertDialogOpen, setConvertDialogOpen] = useState(false);
-  const [convertingLeadId, setConvertingLeadId] = useState<string | null>(null);
-  const [selectedPropertyId, setSelectedPropertyId] = useState('');
+  const [stageChangeOpen, setStageChangeOpen] = useState(false);
+  const [changingLeadId, setChangingLeadId] = useState<string | null>(null);
+  const [targetStage, setTargetStage] = useState<LeadStatus | null>(null);
+
   const [properties, setProperties] = useState<{ id: string; title: string }[]>([]);
-  const [convertLoading, setConvertLoading] = useState(false);
+
+  // Bulk operations state
+  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
   useEffect(() => {
     async function loadProperties() {
@@ -151,7 +159,25 @@ export function LeadsClient({ initialLeads, initialSiteVisits, initialFilters }:
     }
   };
 
-  async function moveLead(leadId: string, direction: 'forward' | 'backward') {
+  async function handleStageChangeConfirm(data: any) {
+    if (!changingLeadId || !targetStage) return;
+    try {
+      if (targetStage === 'converted') {
+        const res = await convertLead(changingLeadId, data.propertyId);
+        if ('error' in res && res.error) throw new Error(res.error);
+      } else {
+        const res = await updateLeadStage(changingLeadId, targetStage);
+        if ('error' in res && res.error) throw new Error(res.error);
+      }
+      setLeads((prev) => prev.map((l) => (l.id === changingLeadId ? { ...l, status: targetStage } : l)));
+      toast.success(`Moved to ${LEAD_STAGE_LABELS[targetStage]}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update stage');
+      throw err;
+    }
+  }
+
+  function moveLead(leadId: string, direction: 'forward' | 'backward') {
     const lead = leads.find((l) => l.id === leadId);
     if (!lead) return;
 
@@ -160,58 +186,12 @@ export function LeadsClient({ initialLeads, initialSiteVisits, initialFilters }:
     if (newIdx < 0 || newIdx >= LEAD_STAGE_ORDER.length) return;
 
     const newStatus = LEAD_STAGE_ORDER[newIdx];
-
-    if (newStatus === 'converted') {
-      setConvertingLeadId(leadId);
-      setConvertDialogOpen(true);
-      return;
-    }
-
-    setLeads((prev) =>
-      prev.map((l) => (l.id === leadId ? { ...l, status: newStatus } : l))
-    );
-
-    try {
-      const res = await updateLeadStage(leadId, newStatus);
-      if ('error' in res && res.error) {
-        throw new Error(res.error);
-      }
-      toast.success(`Moved to ${LEAD_STAGE_LABELS[newStatus]}`);
-    } catch (err: unknown) {
-      setLeads((prev) =>
-        prev.map((l) => (l.id === leadId ? { ...l, status: lead.status } : l))
-      );
-      toast.error(err instanceof Error ? err.message : 'Failed to update lead stage');
-    }
+    setChangingLeadId(leadId);
+    setTargetStage(newStatus);
+    setStageChangeOpen(true);
   }
 
-  async function handleConvert() {
-    if (!convertingLeadId || !selectedPropertyId) {
-      toast.error('Please select a property');
-      return;
-    }
-    setConvertLoading(true);
-    try {
-      const res = await convertLead(convertingLeadId, selectedPropertyId);
-      if ('error' in res && res.error) {
-        throw new Error(res.error);
-      }
-      
-      setLeads((prev) =>
-        prev.map((l) => (l.id === convertingLeadId ? { ...l, status: 'converted' as LeadStatus } : l))
-      );
-      toast.success('Lead converted to tenant successfully!');
-      setConvertDialogOpen(false);
-      setConvertingLeadId(null);
-      setSelectedPropertyId('');
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Failed to convert lead');
-    } finally {
-      setConvertLoading(false);
-    }
-  }
-
-  async function handleDrop(e: React.DragEvent, targetStatus: LeadStatus) {
+  function handleDrop(e: React.DragEvent, targetStatus: LeadStatus) {
     setDraggedOverStage(null);
     const leadId = e.dataTransfer.getData('text/plain');
     if (!leadId) return;
@@ -219,35 +199,47 @@ export function LeadsClient({ initialLeads, initialSiteVisits, initialFilters }:
     const lead = leads.find((l) => l.id === leadId);
     if (!lead || lead.status === targetStatus) return;
 
-    if (targetStatus === 'converted') {
-      setConvertingLeadId(leadId);
-      setConvertDialogOpen(true);
-      return;
-    }
-
-    const previousStatus = lead.status;
-    setLeads((prev) =>
-      prev.map((l) => (l.id === leadId ? { ...l, status: targetStatus } : l))
-    );
-
-    try {
-      const res = await updateLeadStage(leadId, targetStatus);
-      if ('error' in res && res.error) {
-        throw new Error(res.error);
-      }
-      toast.success(`Moved to ${LEAD_STAGE_LABELS[targetStatus]}`);
-    } catch (err: unknown) {
-      setLeads((prev) =>
-        prev.map((l) => (l.id === leadId ? { ...l, status: previousStatus } : l))
-      );
-      toast.error(err instanceof Error ? err.message : 'Failed to update lead stage');
-    }
+    setChangingLeadId(leadId);
+    setTargetStage(targetStatus);
+    setStageChangeOpen(true);
   }
 
   const grouped = LEAD_STAGE_ORDER.reduce((acc, stage) => {
     acc[stage] = leads.filter((l) => l.status === stage);
     return acc;
   }, {} as Record<LeadStatus, Lead[]>);
+
+  const toggleSelectAll = () => {
+    if (selectedLeadIds.size === leads.length) {
+      setSelectedLeadIds(new Set());
+    } else {
+      setSelectedLeadIds(new Set(leads.map(l => l.id)));
+    }
+  };
+
+  const toggleSelectLead = (id: string) => {
+    const next = new Set(selectedLeadIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedLeadIds(next);
+  };
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Are you sure you want to delete ${selectedLeadIds.size} leads?`)) return;
+    setIsDeletingBulk(true);
+    try {
+      const res = await bulkDeleteLeads(Array.from(selectedLeadIds));
+      if (!res.success) throw new Error(res.error);
+      
+      setLeads(prev => prev.filter(l => !selectedLeadIds.has(l.id)));
+      setSelectedLeadIds(new Set());
+      toast.success('Leads deleted successfully');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete leads');
+    } finally {
+      setIsDeletingBulk(false);
+    }
+  };
 
   const handleExportCSV = () => {
     const dataToExport = leads.map((l) => ({
@@ -300,6 +292,34 @@ export function LeadsClient({ initialLeads, initialSiteVisits, initialFilters }:
             Calendar
           </Button>
         </div>
+
+        {selectedLeadIds.size > 0 && viewMode === 'list' && (
+          <Button 
+            variant="destructive" 
+            onClick={handleBulkDelete}
+            disabled={isDeletingBulk}
+            className="w-full sm:w-auto"
+          >
+            {isDeletingBulk ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+            Delete Selected ({selectedLeadIds.size})
+          </Button>
+        )}
+
+        <BulkImportDialog
+          title="Import Leads"
+          description="Upload a CSV file to import multiple leads at once. Phone numbers must be unique."
+          templateHeaders={['name', 'phone', 'email', 'source', 'status', 'budget_min', 'budget_max', 'locality', 'property_type', 'notes']}
+          templateData={[
+            { name: 'John Doe', phone: '9876543210', email: 'john@example.com', source: '99acres', status: 'new', budget_min: '15000', budget_max: '20000', locality: 'HSR Layout', property_type: '2bhk', notes: 'Looking for a quiet place' }
+          ]}
+          templateFilename="leads_import_template.csv"
+          onImport={bulkCreateLeads}
+          onSuccess={() => {
+            setPage(0);
+            setHasMore(true);
+            router.refresh();
+          }}
+        />
 
         <Button 
           onClick={handleExportCSV}
@@ -472,6 +492,13 @@ export function LeadsClient({ initialLeads, initialSiteVisits, initialFilters }:
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox 
+                      checked={leads.length > 0 && selectedLeadIds.size === leads.length}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Select all"
+                    />
+                  </TableHead>
                   <TableHead>Lead Info</TableHead>
                   <TableHead>Budget Range</TableHead>
                   <TableHead>Locality</TableHead>
@@ -483,6 +510,13 @@ export function LeadsClient({ initialLeads, initialSiteVisits, initialFilters }:
               <TableBody>
                 {leads.map((lead) => (
                   <TableRow key={lead.id} className="animate-fade-in">
+                    <TableCell>
+                      <Checkbox 
+                        checked={selectedLeadIds.has(lead.id)}
+                        onCheckedChange={() => toggleSelectLead(lead.id)}
+                        aria-label={`Select ${lead.name}`}
+                      />
+                    </TableCell>
                     <TableCell>
                       <div>
                         <p className="font-semibold text-sm">{lead.name}</p>
@@ -549,42 +583,14 @@ export function LeadsClient({ initialLeads, initialSiteVisits, initialFilters }:
       )}
       </PageContent>
 
-      <Dialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Convert Lead to Tenant</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <p className="text-sm text-muted-foreground">
-              Assign an available property to this lead. A tenant record will be created.
-            </p>
-            <div className="space-y-2">
-              <Label>Available Property *</Label>
-              <Select value={selectedPropertyId} onValueChange={(val) => setSelectedPropertyId(val ?? '')}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a property" />
-                </SelectTrigger>
-                <SelectContent>
-                  {properties.length === 0 ? (
-                    <SelectItem value="none" disabled>No available properties</SelectItem>
-                  ) : (
-                    properties.map(p => (
-                      <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={() => setConvertDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleConvert} disabled={convertLoading || !selectedPropertyId}>
-                {convertLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                Convert & Create Tenant
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <StageChangeDialog 
+        open={stageChangeOpen}
+        onOpenChange={setStageChangeOpen}
+        leadId={changingLeadId || ''}
+        targetStage={targetStage}
+        onConfirm={handleStageChangeConfirm}
+        properties={properties}
+      />
     </PageLayout>
   );
 }

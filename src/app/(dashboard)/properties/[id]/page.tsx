@@ -14,6 +14,7 @@ import {
 import MapViewWrapper from '@/components/ui/map-view-wrapper';
 import { MediaDisplay } from '@/components/ui/media-display';
 import { PropertyGallery } from '@/components/properties/property-gallery';
+import { PropertyRatingCard } from '@/components/properties/property-rating-card';
 import { cn } from '@/lib/utils';
 
 const statusColors: Record<string, string> = {
@@ -190,6 +191,9 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
               </CardContent>
             </Card>
           )}
+
+          {/* Internal Rating */}
+          <PropertyRatingCard propertyId={id} />
         </div>
       </div>
     </div>

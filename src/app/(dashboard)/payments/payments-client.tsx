@@ -32,6 +32,11 @@ import { InfiniteScroll } from '@/components/ui/infinite-scroll';
 import { exportToCSV } from '@/lib/utils/export';
 import { TenantFormDialog } from '@/components/tenant/tenant-form-dialog';
 import { PageLayout, PageHeader, PageToolbar, PageContent } from '@/components/layout/page-layout';
+import { Checkbox } from '@/components/ui/checkbox';
+import { BulkImportDialog } from '@/components/ui/bulk-import-dialog';
+import { bulkRecordPayments } from '@/lib/actions/payments';
+import { TenantPaymentHistory } from '@/components/payments/tenant-payment-history';
+import { CollectionSummary } from '@/components/payments/collection-summary';
 
 type PaymentWithJoins = RentPayment & {
   tenant?: { name: string; phone: string } | null;
@@ -84,6 +89,7 @@ export function PaymentsClient({
   const [tenants, setTenants] = useState<{ id: string; name: string; property_id: string; rent_amount: number; property?: { title: string } | { title: string }[] }[]>([]);
   const [selectedTenant, setSelectedTenant] = useState('');
   const [paymentMode, setPaymentMode] = useState('upi');
+  const [isPartial, setIsPartial] = useState(false);
 
   // URL search and status state
   const [search, setSearch] = useState(initialFilters.search);
@@ -292,7 +298,8 @@ export function PaymentsClient({
         payment_date: fd.get('payment_date') as string,
         payment_mode: paymentMode as any,
         month_year: fd.get('month_year') as string,
-        notes: (fd.get('notes') as string) || null,
+        notes: (fd.get('notes') as string) + (isPartial ? ' [Partial Payment]' : '') || null,
+        status: isPartial ? 'partial' : 'paid',
       });
       
       if ('error' in res && res.error) {
@@ -352,6 +359,22 @@ export function PaymentsClient({
           <Download className="h-4 w-4 mr-2" />
           Export CSV
         </Button>
+
+        <BulkImportDialog
+          title="Import Payments"
+          description="Upload a CSV file to bulk record rent payments."
+          templateHeaders={['tenant_id', 'property_id', 'amount', 'payment_date', 'payment_mode', 'reference_number', 'notes']}
+          templateData={[
+            { tenant_id: '123e4567-e89b-12d3-a456-426614174000', property_id: 'optional-property-id', amount: '25000', payment_date: '2026-05-01', payment_mode: 'upi', reference_number: 'UPI12345678', notes: 'May rent' }
+          ]}
+          templateFilename="payments_import_template.csv"
+          onImport={bulkRecordPayments}
+          onSuccess={() => {
+            setPaymentsPage(0);
+            setPaymentsHasMore(true);
+            router.refresh();
+          }}
+        />
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger render={<Button className="w-full sm:w-auto bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white" />}>
@@ -424,6 +447,10 @@ export function PaymentsClient({
               <div className="space-y-2">
                 <Label>Notes</Label>
                 <Input name="notes" placeholder="Optional notes" />
+              </div>
+              <div className="flex items-center space-x-2 pt-1 pb-2">
+                <Checkbox id="partial" checked={isPartial} onCheckedChange={(checked) => setIsPartial(!!checked)} />
+                <Label htmlFor="partial" className="font-normal text-sm">This is a partial payment</Label>
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
@@ -530,38 +557,39 @@ export function PaymentsClient({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {payments.map((payment) => (
-                      <TableRow key={payment.id} className="animate-fade-in group">
-                        <TableCell className="font-medium">{payment.month_year}</TableCell>
+                    {payments.map((p) => (
+                      <TableRow key={p.id} className="animate-fade-in group">
+                        <TableCell className="font-medium">{p.month_year}</TableCell>
                         <TableCell>
-                          {payment.tenant && (
-                            <div className="flex items-center gap-1.5">
-                              <User className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span className="text-sm">{payment.tenant.name}</span>
+                          {p.tenant && (
+                            <div className="flex flex-col">
+                              <span className="font-medium text-sm">{p.tenant.name || 'Unknown'}</span>
+                              <span className="text-xs text-muted-foreground">{p.tenant.phone}</span>
                             </div>
                           )}
+                          {p.tenant_id && <TenantPaymentHistory tenantId={p.tenant_id} tenantName={p.tenant?.name || 'Unknown'} />}
                         </TableCell>
                         <TableCell>
-                          {payment.property && (
+                          {p.property && (
                             <div className="flex items-center gap-1.5">
                               <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span className="text-sm">{payment.property.title}</span>
+                              <span className="text-sm">{p.property.title}</span>
                             </div>
                           )}
                         </TableCell>
                         <TableCell>
                           <span className="font-semibold flex items-center gap-0.5">
                             <IndianRupee className="h-3.5 w-3.5" />
-                            {payment.amount.toLocaleString('en-IN')}
+                            {p.amount.toLocaleString('en-IN')}
                           </span>
                         </TableCell>
                         <TableCell>
-                          <Badge className={cn("capitalize font-normal", modeColors[payment.payment_mode || 'other'])}>
-                            {(payment.payment_mode || 'other').replace(/_/g, ' ')}
+                          <Badge className={cn("capitalize font-normal", modeColors[p.payment_mode || 'other'])}>
+                            {(p.payment_mode || 'other').replace(/_/g, ' ')}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {format(new Date(payment.payment_date), 'dd MMM yyyy')}
+                          {format(new Date(p.payment_date), 'dd MMM yyyy')}
                         </TableCell>
                         <TableCell>
                           <Button 
@@ -569,15 +597,15 @@ export function PaymentsClient({
                             size="icon-xs" 
                             className="opacity-0 group-hover:opacity-100 transition-opacity"
                             onClick={() => PDFGenerator.generateRentReceipt({
-                              receiptNo: payment.id.slice(0, 8).toUpperCase(),
-                              date: format(new Date(payment.payment_date), 'dd MMM yyyy'),
-                              tenantName: payment.tenant?.name || 'N/A',
-                              propertyName: payment.property?.title || 'N/A',
-                              propertyAddress: (payment as any).property?.locality || 'N/A',
-                              amount: payment.amount,
-                              monthYear: payment.month_year,
-                              paymentMode: payment.payment_mode || 'other',
-                              notes: payment.notes || undefined
+                              receiptNo: p.id.slice(0, 8).toUpperCase(),
+                              date: format(new Date(p.payment_date), 'dd MMM yyyy'),
+                              tenantName: p.tenant?.name || 'N/A',
+                              propertyName: p.property?.title || 'N/A',
+                              propertyAddress: (p as any).property?.locality || 'N/A',
+                              amount: p.amount,
+                              monthYear: p.month_year,
+                              paymentMode: p.payment_mode || 'other',
+                              notes: p.notes || undefined
                             })}
                             title="Download Receipt"
                           >

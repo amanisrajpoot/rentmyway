@@ -14,6 +14,7 @@ import {
   Building2, Clock, Sparkles, ExternalLink, Mic
 } from 'lucide-react';
 import { AddFollowUpDialog } from '@/components/leads/add-follow-up';
+import { LeadStageEditor } from '@/components/leads/lead-stage-editor';
 import { MediaDisplay } from '@/components/ui/media-display';
 import { PhoneLink } from '@/components/ui/phone-link';
 import { cn } from '@/lib/utils';
@@ -70,9 +71,11 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         <div className="flex-1">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold tracking-tight">{lead.name}</h1>
-            <Badge className={stageBadgeColors[lead.status as LeadStatus] || ''}>
-              {LEAD_STAGE_LABELS[lead.status as LeadStatus]}
-            </Badge>
+            <LeadStageEditor 
+              leadId={lead.id} 
+              currentStatus={lead.status as LeadStatus} 
+              availableProperties={matchedProperties || []} 
+            />
           </div>
           <p className="text-muted-foreground text-sm mt-1">
             Created {format(new Date(lead.created_at), 'dd MMM yyyy')}

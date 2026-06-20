@@ -36,6 +36,10 @@ import { MediaDisplay } from '@/components/ui/media-display';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { InfiniteScroll } from '@/components/ui/infinite-scroll';
 import { PageLayout, PageHeader, PageToolbar, PageContent } from '@/components/layout/page-layout';
+import { Checkbox } from '@/components/ui/checkbox';
+import { BulkImportDialog } from '@/components/ui/bulk-import-dialog';
+import { bulkCreateProperties, bulkDeleteProperties } from '@/lib/actions/bulk-properties';
+import { Loader2 } from 'lucide-react';
 
 const statusColors: Record<string, string> = {
   draft: 'bg-muted text-muted-foreground',
@@ -72,6 +76,11 @@ export function PropertiesClient({ initialProperties, userRole, initialFilters }
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(initialProperties.length >= 12);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Bulk Operations State
+  const [selectedPropertyIds, setSelectedPropertyIds] = useState<Set<string>>(new Set());
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
+  const [isSelectMode, setIsSelectMode] = useState(false);
 
   // Sync state if initialProperties changes (from a server-side filter change)
   useEffect(() => {
@@ -158,6 +167,45 @@ export function PropertiesClient({ initialProperties, userRole, initialFilters }
     }
   }
 
+  const toggleSelectProperty = (id: string) => {
+    const next = new Set(selectedPropertyIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedPropertyIds(next);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedPropertyIds.size === properties.length) {
+      setSelectedPropertyIds(new Set());
+    } else {
+      setSelectedPropertyIds(new Set(properties.map(p => p.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Are you sure you want to delete ${selectedPropertyIds.size} properties? This might fail if they have active tenants/leases.`)) return;
+    setIsDeletingBulk(true);
+    try {
+      const res = await bulkDeleteProperties(Array.from(selectedPropertyIds));
+      if (!res.success) throw new Error(res.error);
+      
+      if (res.message) {
+        toast.info(res.message);
+      } else {
+        toast.success('Properties deleted successfully');
+      }
+      
+      setProperties(prev => prev.filter(p => !selectedPropertyIds.has(p.id)));
+      setSelectedPropertyIds(new Set());
+      setIsSelectMode(false);
+      router.refresh();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete properties');
+    } finally {
+      setIsDeletingBulk(false);
+    }
+  };
+
   const handleExportCSV = () => {
     const dataToExport = properties.map((p) => ({
       Title: p.title,
@@ -188,14 +236,32 @@ export function PropertiesClient({ initialProperties, userRole, initialFilters }
           <Download className="h-4 w-4 mr-2" />
           Export CSV
         </Button>
+
         {userRole === 'broker' && (
-          <Link 
-            href="/properties/new" 
-            className={cn(buttonVariants({ size: 'default' }), "w-full sm:w-auto bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white shadow-lg shadow-primary/20")}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Property
-          </Link>
+          <>
+            <BulkImportDialog
+              title="Import Properties"
+              description="Upload a CSV file to import multiple properties. You can provide external URLs for images in the 'image_urls' column (comma separated)."
+              templateHeaders={['title', 'rent', 'locality', 'city', 'state', 'property_type', 'furnishing', 'deposit', 'maintenance_charge', 'address', 'description', 'parking', 'pet_friendly', 'image_urls']}
+              templateData={[
+                { title: 'Luxury 2BHK', rent: '25000', locality: 'Indiranagar', city: 'Bangalore', state: 'Karnataka', property_type: '2bhk', furnishing: 'semi-furnished', deposit: '100000', maintenance_charge: '2000', address: '123 Main St', description: 'Great place', parking: 'true', pet_friendly: 'false', image_urls: 'https://example.com/img1.jpg, https://example.com/img2.jpg' }
+              ]}
+              templateFilename="properties_import_template.csv"
+              onImport={bulkCreateProperties}
+              onSuccess={() => {
+                setPage(0);
+                setHasMore(true);
+                router.refresh();
+              }}
+            />
+            <Link 
+              href="/properties/new" 
+              className={cn(buttonVariants({ size: 'default' }), "w-full sm:w-auto bg-gradient-to-r from-[oklch(0.55_0.2_265)] to-[oklch(0.60_0.19_280)] hover:from-[oklch(0.60_0.22_265)] hover:to-[oklch(0.65_0.21_280)] text-white shadow-lg shadow-primary/20")}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Property
+            </Link>
+          </>
         )}
       </PageHeader>
 
@@ -256,6 +322,32 @@ export function PropertiesClient({ initialProperties, userRole, initialFilters }
             </div>
           </div>
         </div>
+        
+        {userRole === 'broker' && properties.length > 0 && (
+          <div className="flex w-full sm:w-auto gap-2">
+            {isSelectMode ? (
+              <>
+                <Button variant="outline" onClick={toggleSelectAll} className="flex-1 sm:flex-none">
+                  Select All
+                </Button>
+                {selectedPropertyIds.size > 0 && (
+                  <Button variant="destructive" onClick={handleBulkDelete} disabled={isDeletingBulk} className="flex-1 sm:flex-none">
+                    {isDeletingBulk ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                    Delete ({selectedPropertyIds.size})
+                  </Button>
+                )}
+                <Button variant="ghost" onClick={() => {
+                  setIsSelectMode(false);
+                  setSelectedPropertyIds(new Set());
+                }}>Cancel</Button>
+              </>
+            ) : (
+              <Button variant="outline" onClick={() => setIsSelectMode(true)} className="w-full sm:w-auto">
+                Select
+              </Button>
+            )}
+          </div>
+        )}
       </PageToolbar>
 
       <PageContent>
@@ -286,26 +378,40 @@ export function PropertiesClient({ initialProperties, userRole, initialFilters }
             {properties.map((property) => (
               <Card
                 key={property.id}
-                className="border-border/50 group overflow-hidden"
+                className={cn("border-border/50 group overflow-hidden transition-all", selectedPropertyIds.has(property.id) ? "ring-2 ring-primary border-transparent" : "")}
               >
                 {/* Image area */}
-                <Link href={`/properties/${property.id}`}>
-                  <div className="h-36 sm:h-40 bg-gradient-to-br from-primary/10 via-primary/5 to-chart-2/10 flex items-center justify-center relative cursor-pointer overflow-hidden">
+                <div className="relative cursor-pointer overflow-hidden" onClick={() => {
+                  if (isSelectMode) toggleSelectProperty(property.id);
+                  else router.push(`/properties/${property.id}`);
+                }}>
+                  <div className="h-36 sm:h-40 bg-gradient-to-br from-primary/10 via-primary/5 to-chart-2/10 flex items-center justify-center relative overflow-hidden">
                     {property.images && property.images.length > 0 ? (
                       <MediaDisplay 
                         url={property.images[0]} 
                         alt={property.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-                        autoPlayHover={true}
+                        className={cn("w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out", isSelectMode ? "opacity-80" : "")}
+                        autoPlayHover={!isSelectMode}
                       />
                     ) : (
                       <Building2 className="h-10 w-10 text-muted-foreground/15" />
                     )}
+                    
+                    {isSelectMode && (
+                      <div className="absolute top-3 left-3 z-10" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox 
+                          checked={selectedPropertyIds.has(property.id)} 
+                          onCheckedChange={() => toggleSelectProperty(property.id)}
+                          className="h-5 w-5 bg-background/80 border-2"
+                        />
+                      </div>
+                    )}
+
                     <Badge className={`absolute top-3 right-3 ${statusColors[property.status]} text-[11px]`}>
                       {property.status}
                     </Badge>
                   </div>
-                </Link>
+                </div>
 
                 <CardContent className="pt-4 space-y-3">
                   <div className="flex items-start justify-between gap-2">

@@ -158,3 +158,120 @@ export async function getFinancialStats() {
     }
   };
 }
+
+export async function getPaymentsByTenant(tenantId: string) {
+  const supabase = await createClient();
+  const profile = await getUserProfile();
+  if (!profile) return { data: [] };
+
+  const { data, error } = await supabase
+    .from('rent_payments')
+    .select('*, property:properties(title, locality)')
+    .eq('tenant_id', tenantId)
+    .order('payment_date', { ascending: false });
+
+  if (error) return { error: error.message };
+  return { data: data || [] };
+}
+
+export async function bulkRecordPayments(rows: any[]) {
+  const supabase = await createClient();
+  const profile = await getUserProfile();
+  if (!profile) throw new Error('Not authenticated');
+
+  let created = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+
+  const paymentsToInsert = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNum = i + 1;
+
+    if (!row.tenant_id || !row.amount || !row.payment_date) {
+      errors.push(`Row ${rowNum}: Missing required fields (tenant_id, amount, payment_date).`);
+      skipped++;
+      continue;
+    }
+
+    paymentsToInsert.push({
+      tenant_id: row.tenant_id,
+      property_id: row.property_id || null, // Best effort
+      amount: parseFloat(row.amount) || 0,
+      payment_date: row.payment_date,
+      payment_mode: row.payment_mode ? String(row.payment_mode).toLowerCase() : 'cash',
+      reference_number: row.reference_number ? String(row.reference_number) : null,
+      notes: row.notes ? String(row.notes) : null,
+      status: row.status ? String(row.status).toLowerCase() : 'completed',
+    });
+  }
+
+  const chunkSize = 100;
+  for (let i = 0; i < paymentsToInsert.length; i += chunkSize) {
+    const chunk = paymentsToInsert.slice(i, i + chunkSize);
+    const { error } = await supabase.from('rent_payments').insert(chunk);
+    
+    if (error) {
+      errors.push(`Batch insert error: ${error.message}`);
+      skipped += chunk.length;
+    } else {
+      created += chunk.length;
+    }
+  }
+
+  if (created > 0) {
+    await logActivity({
+      user_id: profile.id,
+      action: 'bulk_import_payments',
+      entity_type: 'payment',
+      entity_id: 'bulk',
+      details: { count: created },
+    });
+    revalidatePath('/payments');
+  }
+
+  return { created, skipped, errors };
+}
+
+export async function getMonthlyCollectionSummary() {
+  const supabase = await createClient();
+  const profile = await getUserProfile();
+  if (!profile || profile.role !== 'broker') return { data: [] };
+
+  // Fetch all payments for this broker's properties for the last 6 months
+  const { data: properties } = await supabase.from('properties').select('id').eq('broker_id', profile.id);
+  const propIds = properties?.map(p => p.id) || [];
+  
+  if (propIds.length === 0) return { data: [] };
+
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+  const { data: payments } = await supabase
+    .from('rent_payments')
+    .select('amount, payment_date')
+    .in('property_id', propIds)
+    .gte('payment_date', sixMonthsAgo.toISOString());
+
+  if (!payments) return { data: [] };
+
+  // Group by month
+  const monthlyData: Record<string, number> = {};
+  
+  payments.forEach(p => {
+    const date = new Date(p.payment_date);
+    const monthYear = `${date.toLocaleString('default', { month: 'short' })} ${date.getFullYear()}`;
+    monthlyData[monthYear] = (monthlyData[monthYear] || 0) + p.amount;
+  });
+
+  const formattedData = Object.entries(monthlyData).map(([month, amount]) => ({
+    month,
+    amount
+  })).sort((a, b) => {
+    // Basic sorting - assumes formatting like "Jan 2024"
+    return new Date(a.month).getTime() - new Date(b.month).getTime();
+  });
+
+  return { data: formattedData };
+}
