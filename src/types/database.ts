@@ -31,8 +31,13 @@ export type ComplaintCategory = 'plumbing' | 'electrical' | 'carpentry' | 'paint
 
 export type UtilityCondition = 'working' | 'not_working' | 'needs_repair';
 
-export type PaymentMode = 'cash' | 'upi' | 'bank_transfer' | 'cheque' | 'other';
+export type PaymentMode = 'cash' | 'upi' | 'bank_transfer' | 'cheque' | 'online' | 'enach' | 'other';
 export type PaymentStatus = 'pending' | 'paid' | 'partial' | 'overdue' | 'waived';
+
+export type OnlinePaymentStatus = 'created' | 'attempted' | 'paid' | 'failed';
+export type MandateStatus = 'initiated' | 'active' | 'paused' | 'cancelled' | 'rejected';
+export type SettlementMode = 'bank_transfer' | 'upi';
+export type TenantType = 'residential' | 'commercial' | 'pg';
 
 export type LeaseStatus = 'draft' | 'active' | 'expiring' | 'expired' | 'renewed' | 'terminated';
 
@@ -42,12 +47,127 @@ export type BillPaidBy = 'tenant' | 'owner' | 'broker';
 
 export type PayoutStatus = 'pending' | 'paid';
 
-export type PgRoomType = 'single' | 'double' | 'triple' | 'dormitory';
+export type PgRoomType = 'single' | 'double' | 'triple' | 'dormitory' | '1bhk' | '2bhk';
 export type PgBedStatus = 'vacant' | 'occupied' | 'reserved' | 'maintenance';
 export type MealType = 'breakfast' | 'lunch' | 'snack' | 'dinner';
 export type PgRuleType = 'entry_time' | 'exit_time' | 'guest_policy' | 'smoking' | 'alcohol' | 'noise' | 'food' | 'other';
 export type RefundPolicy = 'full' | 'partial' | 'none';
-export type TenantType = 'regular' | 'pg';
+
+
+// ============================================
+// Phase 11 Payment Gateway Types
+// ============================================
+
+export interface PgGatewayConfig {
+  id: string;
+  broker_id: string;
+  cashfree_key_id: string | null;
+  cashfree_key_secret: string | null;
+  online_payments_enabled: boolean;
+  convenience_fee_type: 'fixed' | 'percentage';
+  convenience_fee_amount: number;
+  webhook_secret: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export type PgGatewayConfigInsert = Omit<PgGatewayConfig, 'id' | 'created_at' | 'updated_at'>;
+export type PgGatewayConfigUpdate = Partial<PgGatewayConfigInsert>;
+
+export interface PaymentLink {
+  id: string;
+  schedule_id: string;
+  cashfree_link_id: string;
+  short_url: string;
+  amount: number;
+  status: 'created' | 'paid' | 'expired' | 'cancelled';
+  expires_at: string | null;
+  created_at: string;
+}
+export type PaymentLinkInsert = Omit<PaymentLink, 'id' | 'created_at'>;
+
+export interface OnlineTransaction {
+  id: string;
+  broker_id: string;
+  tenant_id: string | null;
+  schedule_id: string | null;
+  cashfree_order_id: string;
+  cashfree_payment_id: string | null;
+  amount: number;
+  currency: string;
+  status: OnlinePaymentStatus;
+  method: string | null;
+  error_code: string | null;
+  error_description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export type OnlineTransactionInsert = Omit<OnlineTransaction, 'id' | 'created_at' | 'updated_at'>;
+
+export interface EnachMandate {
+  id: string;
+  tenant_id: string;
+  broker_id: string;
+  cashfree_customer_id: string | null;
+  cashfree_order_id: string | null;
+  cashfree_token_id: string | null;
+  status: MandateStatus;
+  max_amount: number;
+  bank_name: string | null;
+  account_last4: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export type EnachMandateInsert = Omit<EnachMandate, 'id' | 'created_at' | 'updated_at'>;
+
+export interface SettlementAccount {
+  id: string;
+  owner_id: string;
+  broker_id: string;
+  account_name: string;
+  account_number: string;
+  ifsc_code: string;
+  bank_name: string | null;
+  cashfree_account_id: string | null;
+  is_default: boolean;
+  is_verified: boolean;
+  created_at: string;
+}
+export type SettlementAccountInsert = Omit<SettlementAccount, 'id' | 'created_at'>;
+
+export interface SettlementSplit {
+  id: string;
+  property_id: string;
+  broker_percent: number;
+  owner_percent: number;
+  created_at: string;
+  updated_at: string;
+}
+export type SettlementSplitInsert = Omit<SettlementSplit, 'id' | 'created_at' | 'updated_at'>;
+
+export interface TaxConfig {
+  id: string;
+  property_id: string;
+  gst_enabled: boolean;
+  gst_number: string | null;
+  gst_percent: number;
+  tds_enabled: boolean;
+  tds_percent: number;
+  created_at: string;
+  updated_at: string;
+}
+export type TaxConfigInsert = Omit<TaxConfig, 'id' | 'created_at' | 'updated_at'>;
+
+export interface CashCollectionOtp {
+  id: string;
+  schedule_id: string;
+  tenant_id: string;
+  collector_id: string;
+  otp_code: string;
+  status: 'pending' | 'verified' | 'expired';
+  expires_at: string;
+  created_at: string;
+}
+export type CashCollectionOtpInsert = Omit<CashCollectionOtp, 'id' | 'created_at'>;
 
 // ============================================
 // Table Row Types
@@ -248,6 +368,14 @@ export interface RentPayment {
   status: PaymentStatus;
   due_date: string | null;
   broker_id: string | null;
+  cashfree_payment_id?: string | null;
+  cashfree_order_id?: string | null;
+  gateway_fee?: number;
+  gst_amount?: number;
+  tds_amount?: number;
+  convenience_fee?: number;
+  payment_link_id?: string | null;
+  is_online?: boolean;
   created_at: string;
   // Joined
   tenant?: Tenant;
@@ -292,6 +420,9 @@ export interface RentScheduleItem {
   due_date: string;
   status: PaymentStatus;
   payment_id: string | null;
+  payment_link_url?: string | null;
+  payment_link_id?: string | null;
+  enach_debit_id?: string | null;
   created_at: string;
   // Joined
   tenant?: Tenant;
@@ -310,6 +441,11 @@ export interface OwnerPayout {
   payment_mode: PaymentMode | null;
   status: PayoutStatus;
   notes: string | null;
+  cashfree_transfer_id?: string | null;
+  settlement_account_id?: string | null;
+  gst_deducted?: number;
+  tds_deducted?: number;
+  broker_commission?: number;
   created_at: string;
   // Joined
   owner?: Owner;
@@ -645,6 +781,7 @@ export type RentPaymentInsert = Omit<RentPayment, 'id' | 'created_at' | 'tenant'
   due_date?: string | null;
   broker_id?: string | null;
 };
+export type RentPaymentUpdate = Partial<RentPaymentInsert>;
 
 export type LeaseAgreementInsert = Omit<LeaseAgreement, 'id' | 'created_at' | 'updated_at' | 'tenant' | 'property'>;
 export type LeaseAgreementUpdate = Partial<LeaseAgreementInsert>;
@@ -902,6 +1039,8 @@ export const PG_ROOM_TYPE_LABELS: Record<PgRoomType, string> = {
   double: 'Double',
   triple: 'Triple',
   dormitory: 'Dormitory',
+  '1bhk': '1 BHK',
+  '2bhk': '2 BHK',
 };
 
 export const PG_BED_STATUS_LABELS: Record<PgBedStatus, string> = {

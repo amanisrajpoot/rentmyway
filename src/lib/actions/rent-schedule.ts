@@ -226,6 +226,7 @@ export async function getRentSummary() {
 }
 
 import { createNotification } from '@/lib/actions/notifications';
+import { generatePaymentLink } from './online-payments';
 
 export async function runRentAutomation() {
   const supabase = await createClient();
@@ -264,12 +265,23 @@ export async function runRentAutomation() {
     const month = schedule.month_year;
     const amount = schedule.expected_amount;
 
+    // Generate payment link if not exists
+    let paymentUrl = schedule.payment_link_url;
+    if (!paymentUrl) {
+      const linkRes = await generatePaymentLink(schedule.id);
+      if (linkRes.success && linkRes.url) {
+        paymentUrl = linkRes.url;
+      }
+    }
+
+    const payMessageAddition = paymentUrl ? ` Pay online here: ${paymentUrl}` : '';
+
     if (schedule.tenant?.profile_id) {
       await createNotification({
         user_id: schedule.tenant.profile_id,
         type: 'rent_overdue',
         title: 'Rent Overdue Alert',
-        message: `Your rent of ₹${amount.toLocaleString('en-IN')} for ${month} at ${propertyTitle} is overdue. Please pay immediately.`,
+        message: `Your rent of ₹${amount.toLocaleString('en-IN')} for ${month} at ${propertyTitle} is overdue. Please pay immediately.${payMessageAddition}`,
         link: '/tenant/dashboard',
         metadata: { schedule_id: schedule.id }
       });
@@ -315,11 +327,22 @@ export async function runRentAutomation() {
         .limit(1);
 
       if (!existing || existing.length === 0) {
+        // Pre-generate link for upcoming payment
+        let paymentUrl = schedule.payment_link_url;
+        if (!paymentUrl) {
+          const linkRes = await generatePaymentLink(schedule.id);
+          if (linkRes.success && linkRes.url) {
+            paymentUrl = linkRes.url;
+          }
+        }
+        
+        const payMessageAddition = paymentUrl ? ` Pay online here: ${paymentUrl}` : '';
+
         await createNotification({
           user_id: schedule.tenant.profile_id,
           type: 'rent_due',
           title: 'Upcoming Rent Reminder',
-          message: `Your rent of ₹${amount.toLocaleString('en-IN')} for ${month} at ${propertyTitle} is due on ${schedule.due_date}.`,
+          message: `Your rent of ₹${amount.toLocaleString('en-IN')} for ${month} at ${propertyTitle} is due on ${schedule.due_date}.${payMessageAddition}`,
           link: '/tenant/dashboard',
           metadata: { schedule_id: schedule.id }
         });

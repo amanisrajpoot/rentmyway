@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { generatePaymentLink } from './online-payments';
 
 /**
  * Simulates sending a WhatsApp message via Interakt API.
@@ -20,7 +21,7 @@ async function sendInteraktWhatsAppMessage(phone: string, templateName: string, 
 /**
  * Triggers a manual rent reminder to a specific tenant.
  */
-export async function sendRentReminder(tenantId: string, monthYear: string, amountDue: number, phone: string) {
+export async function sendRentReminder(tenantId: string, monthYear: string, amountDue: number, phone: string, scheduleId?: string) {
   const supabase = await createClient();
 
   try {
@@ -49,6 +50,63 @@ export async function sendRentReminder(tenantId: string, monthYear: string, amou
     return { success: true };
   } catch (error: any) {
     return { error: error.message || 'Failed to send reminder via Interakt' };
+  }
+}
+
+/**
+ * Generates a payment link and sends a reminder.
+ */
+export async function sendReminderWithPaymentLink(scheduleId: string) {
+  const supabase = await createClient();
+
+  try {
+    const { data: schedule } = await supabase
+      .from('rent_schedule')
+      .select('*, tenant:tenants(phone, email)')
+      .eq('id', scheduleId)
+      .single();
+
+    if (!schedule) return { error: 'Schedule not found' };
+
+    let paymentUrl = schedule.payment_link_url;
+
+    // Generate link if it doesn't exist
+    if (!paymentUrl) {
+      const linkResult = await generatePaymentLink(scheduleId);
+      if (linkResult.success && linkResult.url) {
+        paymentUrl = linkResult.url;
+      } else {
+        console.warn('Failed to generate payment link, sending standard reminder');
+      }
+    }
+
+    const phone = schedule.tenant?.phone;
+    if (!phone) return { error: 'Tenant phone number missing' };
+
+    const bodyValues = paymentUrl 
+      ? [schedule.month_year, schedule.expected_amount.toLocaleString('en-IN'), paymentUrl]
+      : [schedule.month_year, schedule.expected_amount.toLocaleString('en-IN')];
+      
+    const templateName = paymentUrl ? 'rent_reminder_with_link_v1' : 'rent_reminder_v1';
+
+    const interaktId = await sendInteraktWhatsAppMessage(phone, templateName, bodyValues);
+
+    const logMessage = paymentUrl 
+      ? `Reminder: Rent of ₹${schedule.expected_amount.toLocaleString('en-IN')} for ${schedule.month_year} is due. Pay here: ${paymentUrl}`
+      : `Reminder: Rent of ₹${schedule.expected_amount.toLocaleString('en-IN')} for ${schedule.month_year} is due.`;
+
+    await supabase.from('whatsapp_logs').insert({
+      tenant_id: schedule.tenant_id,
+      message_type: 'rent_reminder',
+      message_content: logMessage,
+      interakt_message_id: interaktId,
+      status: 'sent'
+    });
+
+    revalidatePath('/payments');
+    return { success: true, paymentUrl };
+  } catch (error: any) {
+    return { error: error.message || 'Failed to send reminder with payment link' };
   }
 }
 

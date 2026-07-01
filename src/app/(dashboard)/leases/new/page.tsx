@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,9 +29,12 @@ type TenantOption = {
 
 export default function NewLeasePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialTenantId = searchParams.get('tenantId') || '';
+  
   const [saving, setSaving] = useState(false);
   const [tenants, setTenants] = useState<TenantOption[]>([]);
-  const [selectedTenant, setSelectedTenant] = useState('');
+  const [selectedTenant, setSelectedTenant] = useState(initialTenantId);
   const [agreementUrls, setAgreementUrls] = useState<string[]>([]);
 
   useEffect(() => {

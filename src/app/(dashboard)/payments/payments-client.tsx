@@ -37,6 +37,9 @@ import { BulkImportDialog } from '@/components/ui/bulk-import-dialog';
 import { bulkRecordPayments } from '@/lib/actions/payments';
 import { TenantPaymentHistory } from '@/components/payments/tenant-payment-history';
 import { CollectionSummary } from '@/components/payments/collection-summary';
+import { PaymentLinkButton } from '@/components/payments/payment-link-button';
+import { CashOtpDialog } from '@/components/payments/cash-otp-dialog';
+import { EnachSetupDialog } from '@/components/payments/enach-setup-dialog';
 
 type PaymentWithJoins = RentPayment & {
   tenant?: { name: string; phone: string } | null;
@@ -868,7 +871,10 @@ export function PaymentsClient({
                           </TableCell>
                           <TableCell className="text-right">
                             {s.status !== 'paid' && (
-                              <div className="flex items-center justify-end gap-2">
+                              <div className="flex items-center justify-end gap-2 flex-wrap max-w-[400px]">
+                                <PaymentLinkButton scheduleId={s.id} existingUrl={s.payment_link_url} />
+                                <CashOtpDialog scheduleId={s.id} amount={amount} />
+                                <EnachSetupDialog tenantId={s.tenant_id} tenantName={tenantName} maxAmount={amount + 2000} />
                                 <a href={waUrl} target="_blank" rel="noopener noreferrer">
                                   <Button 
                                     variant="outline" 

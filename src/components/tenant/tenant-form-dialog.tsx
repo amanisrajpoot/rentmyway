@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +26,7 @@ interface TenantFormDialogProps {
 }
 
 export function TenantFormDialog({ onSuccess, trigger, defaultPropertyId }: TenantFormDialogProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [properties, setProperties] = useState<Property[]>([]);
@@ -85,9 +87,16 @@ export function TenantFormDialog({ onSuccess, trigger, defaultPropertyId }: Tena
         throw new Error(res.error);
       }
       
-      toast.success('Tenant created successfully');
+      const tenantData = 'data' in res ? res.data : undefined;
+      
       setOpen(false);
-      onSuccess?.('data' in res ? res.data : undefined);
+      onSuccess?.(tenantData);
+
+      if (tenantData && window.confirm('Tenant created successfully. Would you like to create a rental agreement now?')) {
+        router.push(`/leases/new?tenantId=${tenantData.id}`);
+      } else {
+        toast.success('Tenant created successfully');
+      }
     } catch (err: any) {
       toast.error(err.message || 'Failed to create tenant');
     } finally {

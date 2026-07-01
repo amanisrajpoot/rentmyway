@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -8,8 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { getPgRooms } from '@/lib/actions/pg-rooms';
 import { Loader2, Bed, Users } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { createPgRoom, bulkCreatePgRooms, assignBedToTenant, vacateBed, getUnassignedTenants } from '@/lib/actions/pg-rooms';
 import { onboardSinglePgTenant } from '@/lib/actions/pg-onboarding';
 import { UploadCloud, Download, UserPlus, UserMinus } from 'lucide-react';
@@ -17,6 +20,7 @@ import { toast } from 'sonner';
 import type { Property, PgRoom } from '@/types/database';
 
 export function RoomsClient({ properties }: { properties: Property[] }) {
+  const router = useRouter();
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>(properties[0]?.id || '');
   const [rooms, setRooms] = useState<PgRoom[]>([]);
   const [loading, setLoading] = useState(false);
@@ -64,9 +68,13 @@ export function RoomsClient({ properties }: { properties: Property[] }) {
       const result = await assignBedToTenant(assignBedData.bedId, tenantId, rentOverride);
       if (result.error) toast.error(result.error);
       else {
-        toast.success('Tenant assigned to bed');
         setAssignBedData(null);
-        loadRooms(selectedPropertyId);
+        if (window.confirm('Tenant assigned to bed successfully. Would you like to create a rental agreement now?')) {
+          router.push(`/leases/new?tenantId=${tenantId}`);
+        } else {
+          toast.success('Tenant assigned to bed');
+          loadRooms(selectedPropertyId);
+        }
       }
     } else {
       const data = {
@@ -83,9 +91,13 @@ export function RoomsClient({ properties }: { properties: Property[] }) {
       const result = await onboardSinglePgTenant(data);
       if (result.error) toast.error(result.error);
       else {
-        toast.success('New tenant onboarded & assigned successfully');
         setAssignBedData(null);
-        loadRooms(selectedPropertyId);
+        if (result.data && window.confirm('New tenant onboarded & assigned successfully. Would you like to create a rental agreement now?')) {
+          router.push(`/leases/new?tenantId=${result.data.id}`);
+        } else {
+          toast.success('New tenant onboarded & assigned successfully');
+          loadRooms(selectedPropertyId);
+        }
       }
     }
     setActionLoading(false);
@@ -182,7 +194,34 @@ export function RoomsClient({ properties }: { properties: Property[] }) {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="rounded-xl shadow-sm border-border/40 bg-slate-50 dark:bg-slate-900/50">
+          <CardContent className="p-4">
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Rooms</p>
+            <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1">{rooms.length}</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-xl shadow-sm border-border/40 bg-slate-50 dark:bg-slate-900/50">
+          <CardContent className="p-4">
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Beds</p>
+            <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1">{rooms.reduce((acc, r) => acc + r.total_beds, 0)}</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-xl shadow-sm border-border/40 bg-slate-50 dark:bg-slate-900/50">
+          <CardContent className="p-4">
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Vacant Beds</p>
+            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">{rooms.reduce((acc, r) => acc + (r.total_beds - r.occupied_beds), 0)}</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-xl shadow-sm border-border/40 bg-slate-50 dark:bg-slate-900/50">
+          <CardContent className="p-4">
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Occupied</p>
+            <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1">{rooms.reduce((acc, r) => acc + r.occupied_beds, 0)}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl border border-border/40 bg-white dark:bg-slate-950 shadow-sm">
         <Select value={selectedPropertyId} onValueChange={(val: any) => setSelectedPropertyId(val)}>
           <SelectTrigger className="w-[300px]">
             <SelectValue placeholder="Select Property">
@@ -195,11 +234,11 @@ export function RoomsClient({ properties }: { properties: Property[] }) {
             ))}
           </SelectContent>
         </Select>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setIsBulkDialogOpen(true)}>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Button variant="outline" className="w-full sm:w-auto" onClick={() => setIsBulkDialogOpen(true)}>
             <UploadCloud className="h-4 w-4 mr-2" /> Bulk Upload
           </Button>
-          <Button onClick={() => setIsDialogOpen(true)}>Add Room</Button>
+          <Button className="w-full sm:w-auto bg-slate-800 hover:bg-slate-700 text-white" onClick={() => setIsDialogOpen(true)}>Add Room</Button>
         </div>
       </div>
 
@@ -212,8 +251,8 @@ export function RoomsClient({ properties }: { properties: Property[] }) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 stagger-children">
           {rooms.map(room => (
-            <Card key={room.id} className="border-border/50 hover:shadow-md transition-all duration-300">
-              <CardHeader className="pb-2">
+            <Card key={room.id} className="border-border/40 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+              <CardHeader className="pb-2 bg-slate-50/50 dark:bg-slate-900/20 rounded-t-xl border-b border-border/40">
                 <div className="flex justify-between items-start">
                   <CardTitle className="text-lg">Room {room.room_number}</CardTitle>
                   <Badge variant="outline" className="capitalize">{room.room_type}</Badge>
@@ -229,9 +268,9 @@ export function RoomsClient({ properties }: { properties: Property[] }) {
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Beds</p>
                   <div className="grid grid-cols-2 gap-2">
                     {room.beds?.map(bed => (
-                      <div key={bed.id} className={`p-2 rounded border text-xs flex justify-between items-center transition-colors ${
-                        bed.status === 'vacant' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-400' :
-                        bed.status === 'occupied' ? 'bg-red-500/10 border-red-500/20 text-red-700 dark:text-red-400' :
+                      <div key={bed.id} className={`p-2 rounded-lg border text-xs flex justify-between items-center transition-colors ${
+                        bed.status === 'vacant' ? 'bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300' :
+                        bed.status === 'occupied' ? 'bg-slate-200 border-slate-300 text-slate-800 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200' :
                         'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-400'
                       }`}>
                         <div className="flex flex-col">
@@ -239,11 +278,11 @@ export function RoomsClient({ properties }: { properties: Property[] }) {
                           <span className="text-[10px] truncate max-w-[80px]" title={bed.tenant?.name || 'Vacant'}>{bed.status === 'vacant' ? 'Vacant' : bed.tenant?.name || 'Occupied'}</span>
                         </div>
                         {bed.status === 'vacant' ? (
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-900/50" onClick={() => { setAssignBedData({ bedId: bed.id, roomId: room.id, defaultRent: room.rent_per_bed, defaultDeposit: room.deposit_per_bed }); setAssignMode('existing'); }} title="Assign Tenant">
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700" onClick={() => { setAssignBedData({ bedId: bed.id, roomId: room.id, defaultRent: room.rent_per_bed, defaultDeposit: room.deposit_per_bed }); setAssignMode('existing'); }} title="Assign Tenant">
                             <UserPlus className="h-3.5 w-3.5" />
                           </Button>
                         ) : (
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/50" onClick={() => setVacateBedId(bed.id)} title="Vacate Bed">
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-500 hover:bg-slate-300 dark:hover:bg-slate-600" onClick={() => setVacateBedId(bed.id)} title="Vacate Bed">
                             <UserMinus className="h-3.5 w-3.5" />
                           </Button>
                         )}
@@ -257,52 +296,75 @@ export function RoomsClient({ properties }: { properties: Property[] }) {
         </div>
       )}
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Room</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleAddRoom} className="space-y-4 mt-4">
+      <Sheet open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <SheetContent className="sm:max-w-md md:max-w-lg overflow-y-auto bg-slate-50 dark:bg-slate-950">
+          <SheetHeader>
+            <SheetTitle className="text-xl font-bold text-slate-800 dark:text-slate-100">Room Details</SheetTitle>
+          </SheetHeader>
+          <form onSubmit={handleAddRoom} className="space-y-6 mt-6">
             <div className="space-y-2">
-              <Label>Room Number</Label>
-              <Input name="room_number" placeholder="e.g., 101" required />
+              <Label className="text-slate-700 dark:text-slate-300">Room Number *</Label>
+              <Input name="room_number" placeholder="Ex. Room 001" className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800" required />
             </div>
-            <div className="space-y-2">
-              <Label>Room Type</Label>
-              <Select name="room_type" defaultValue="single">
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="single">Single</SelectItem>
-                  <SelectItem value="double">Double</SelectItem>
-                  <SelectItem value="triple">Triple</SelectItem>
-                  <SelectItem value="dormitory">Dormitory</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Total Beds</Label>
-                <Input name="total_beds" type="number" min="1" max="20" required defaultValue="1" />
+                <Label className="text-slate-700 dark:text-slate-300">Unit Type *</Label>
+                <Select name="room_type" defaultValue="single">
+                  <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="single">Single</SelectItem>
+                    <SelectItem value="double">Double</SelectItem>
+                    <SelectItem value="triple">Triple</SelectItem>
+                    <SelectItem value="dormitory">Dormitory</SelectItem>
+                    <SelectItem value="1bhk">1 BHK</SelectItem>
+                    <SelectItem value="2bhk">2 BHK</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
-                <Label>Rent Per Bed</Label>
-                <Input name="rent_per_bed" type="number" min="0" required placeholder="e.g., 8000" />
-              </div>
-              <div className="space-y-2">
-                <Label>Deposit Per Bed</Label>
-                <Input name="deposit_per_bed" type="number" min="0" required placeholder="e.g., 16000" />
+                <Label className="text-slate-700 dark:text-slate-300">Total Beds *</Label>
+                <Input name="total_beds" type="number" min="1" max="20" required defaultValue="1" className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800" />
               </div>
             </div>
-            <Button type="submit" className="w-full" disabled={addingRoom}>
-              {addingRoom ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Create Room & Generate Beds
-            </Button>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-slate-700 dark:text-slate-300">Amount Per Bed (Rent) *</Label>
+                <Input name="rent_per_bed" type="number" min="0" required placeholder="0" className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-slate-700 dark:text-slate-300">Deposit Per Bed *</Label>
+                <Input name="deposit_per_bed" type="number" min="0" required placeholder="0" className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800" />
+              </div>
+            </div>
+            
+            <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+              <Label className="text-slate-800 dark:text-slate-200 font-semibold">Room Facilities</Label>
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
+                {['AC', 'Table', 'TV', 'Washroom', 'Balcony', 'Fridge', 'Almirah', 'Chair'].map(fac => (
+                  <label key={fac} className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer dark:bg-slate-900 dark:border-slate-800 dark:hover:bg-slate-800/50 transition-colors">
+                    <Checkbox className="sr-only" name={`facility_${fac.toLowerCase()}`} />
+                    <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 mb-2 flex items-center justify-center text-slate-500">
+                       <span className="text-xs">✦</span>
+                    </div>
+                    <span className="text-xs font-medium text-slate-600 dark:text-slate-400">{fac}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-6">
+              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-12 text-base font-semibold shadow-md" disabled={addingRoom}>
+                {addingRoom ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}
+                Add Room
+              </Button>
+            </div>
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       <Dialog open={isBulkDialogOpen} onOpenChange={setIsBulkDialogOpen}>
         <DialogContent>

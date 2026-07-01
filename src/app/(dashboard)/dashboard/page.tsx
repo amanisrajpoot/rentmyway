@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ActivityFeed } from '@/components/layout/activity-feed';
+import { TenantFormDialog } from '@/components/tenant/tenant-form-dialog';
 
 async function getBrokerStats(brokerId: string) {
   const supabase = await createClient();
@@ -89,7 +90,7 @@ const statCards = [
     subtitle: 'availableProperties' as const,
     subtitleLabel: 'available',
     icon: Building2,
-    gradient: 'from-[oklch(0.55_0.2_265)] to-[oklch(0.50_0.19_280)]',
+    colorClass: 'bg-slate-800 text-white',
     href: '/properties',
   },
   {
@@ -98,7 +99,7 @@ const statCards = [
     subtitle: 'activeLeads' as const,
     subtitleLabel: 'active',
     icon: Users,
-    gradient: 'from-[oklch(0.60_0.19_160)] to-[oklch(0.55_0.18_180)]',
+    colorClass: 'bg-slate-700 text-white',
     href: '/leads',
   },
   {
@@ -107,7 +108,7 @@ const statCards = [
     subtitle: 'convertedLeads' as const,
     subtitleLabel: 'converted',
     icon: UserCheck,
-    gradient: 'from-[oklch(0.65_0.15_80)] to-[oklch(0.60_0.14_60)]',
+    colorClass: 'bg-slate-600 text-white',
     href: '/tenants',
   },
   {
@@ -116,7 +117,7 @@ const statCards = [
     subtitle: 'rentedProperties' as const,
     subtitleLabel: 'rented',
     icon: MessageSquareWarning,
-    gradient: 'from-[oklch(0.60_0.2_25)] to-[oklch(0.55_0.19_10)]',
+    colorClass: 'bg-slate-500 text-white',
     href: '/complaints',
   },
 ];
@@ -137,6 +138,15 @@ const quickActions = [
     icon: Users,
     color: 'text-chart-2',
     bg: 'bg-chart-2/10 group-hover:bg-chart-2/15',
+  },
+  {
+    title: 'Add Tenant',
+    desc: 'Onboard a new tenant',
+    href: '#',
+    isDialog: true,
+    icon: UserCheck,
+    color: 'text-emerald-500',
+    bg: 'bg-emerald-500/10 group-hover:bg-emerald-500/15',
   },
   {
     title: 'View Complaints',
@@ -177,20 +187,19 @@ export default async function DashboardPage() {
             const Icon = card.icon;
             return (
               <Link key={card.title} href={card.href}>
-                <Card className="relative overflow-hidden border-border/50 cursor-pointer group h-full">
-                  <div className={`absolute inset-0 bg-gradient-to-br ${card.gradient} opacity-[0.06] group-hover:opacity-[0.1] transition-opacity duration-500`} />
+                <Card className="relative overflow-hidden border-border/40 cursor-pointer group h-full rounded-2xl shadow-sm hover:shadow-md transition-shadow">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
                       {card.title}
                     </CardTitle>
-                    <div className={`p-1.5 sm:p-2 rounded-lg bg-gradient-to-br ${card.gradient} opacity-90`}>
-                      <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
+                    <div className={`p-1.5 sm:p-2 rounded-lg ${card.colorClass}`}>
+                      <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl sm:text-3xl font-bold tabular-nums">{stats[card.key]}</div>
+                    <div className="text-2xl sm:text-3xl font-bold tabular-nums text-slate-800 dark:text-slate-100">{stats[card.key]}</div>
                     <p className="text-[11px] sm:text-xs text-muted-foreground mt-1">
-                      <span className="text-primary font-medium">{stats[card.subtitle]}</span>{' '}
+                      <span className="text-slate-600 dark:text-slate-300 font-medium">{stats[card.subtitle]}</span>{' '}
                       {card.subtitleLabel}
                     </p>
                   </CardContent>
@@ -206,20 +215,34 @@ export default async function DashboardPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 stagger-children">
           {quickActions.map((action) => {
             const Icon = action.icon;
+            
+            const cardContent = (
+              <Card className="border-border/40 cursor-pointer group h-full rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="pt-5 sm:pt-6 flex items-center gap-4">
+                  <div className={`p-3 rounded-xl bg-slate-100 dark:bg-slate-800 transition-colors duration-300 shrink-0`}>
+                    <Icon className={`h-5 w-5 sm:h-6 sm:w-6 text-slate-700 dark:text-slate-200`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-sm sm:text-base text-slate-800 dark:text-slate-100 text-left">{action.title}</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground truncate text-left">{action.desc}</p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-slate-700 group-hover:translate-x-0.5 transition-all duration-300 shrink-0" />
+                </CardContent>
+              </Card>
+            );
+
+            if (action.isDialog) {
+              return (
+                <TenantFormDialog 
+                  key={action.title} 
+                  trigger={<button type="button" className="w-full text-left h-full outline-none focus:outline-none">{cardContent}</button>} 
+                />
+              );
+            }
+
             return (
               <Link key={action.href} href={action.href}>
-                <Card className="border-border/50 cursor-pointer group h-full">
-                  <CardContent className="pt-5 sm:pt-6 flex items-center gap-4">
-                    <div className={`p-3 rounded-xl ${action.bg} transition-colors duration-300 shrink-0`}>
-                      <Icon className={`h-5 w-5 sm:h-6 sm:w-6 ${action.color}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-sm sm:text-base">{action.title}</h3>
-                      <p className="text-xs sm:text-sm text-muted-foreground truncate">{action.desc}</p>
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground group-hover:translate-x-0.5 transition-all duration-300 shrink-0" />
-                  </CardContent>
-                </Card>
+                {cardContent}
               </Link>
             );
           })}

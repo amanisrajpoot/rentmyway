@@ -18,9 +18,17 @@ import {
   PieChart,
   Bed,
   Utensils,
-  ShieldAlert,
   UsersRound,
   Globe,
+  Settings2,
+  Landmark,
+  ReceiptText,
+  BookOpen,
+  CalendarDays,
+  Camera,
+  DoorOpen,
+  CheckSquare,
+  ShieldAlert
 } from 'lucide-react';
 import { type UserRole } from '@/types/database';
 
@@ -141,6 +149,18 @@ export const navConfig: NavGroup[] = [
         roles: ['broker'],
       },
       {
+        title: 'Settlements',
+        href: '/settlements',
+        icon: Landmark,
+        roles: ['broker'],
+      },
+      {
+        title: 'Tax & Compliance',
+        href: '/tax-settings',
+        icon: ReceiptText,
+        roles: ['broker'],
+      },
+      {
         title: 'Financials',
         href: '/owner/financials',
         icon: Wallet,
@@ -256,6 +276,12 @@ export const navConfig: NavGroup[] = [
         href: '/notifications',
         icon: Bell,
         roles: ['broker', 'owner', 'tenant', 'pg_owner'],
+      },
+      {
+        title: 'Gateway Settings',
+        href: '/settings/gateway',
+        icon: Settings2,
+        roles: ['broker'],
       },
       {
         title: 'Settings',

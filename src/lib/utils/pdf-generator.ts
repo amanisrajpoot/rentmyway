@@ -19,6 +19,10 @@ export interface ReceiptData {
   monthYear: string;
   paymentMode: string;
   notes?: string;
+  gstAmount?: number;
+  gstNumber?: string;
+  tdsAmount?: number;
+  convenienceFee?: number;
 }
 
 export interface InvoiceData {
@@ -91,17 +95,41 @@ export class PDFGenerator {
     doc.text(data.date, 160, 60);
 
     // Main Content
+    const tableBody: any[][] = [
+      ['Received From', data.tenantName],
+      ['Property', data.propertyName],
+      ['Address', data.propertyAddress],
+      ['For Month/Year', data.monthYear],
+      ['Payment Mode', data.paymentMode.toUpperCase()]
+    ];
+
+    let totalAmount = data.amount;
+
+    if (data.convenienceFee && data.convenienceFee > 0) {
+      tableBody.push(['Convenience Fee', `INR ${data.convenienceFee.toLocaleString('en-IN')}`]);
+      totalAmount += data.convenienceFee;
+    }
+
+    if (data.gstAmount && data.gstAmount > 0) {
+      tableBody.push(['GST (18%)', `INR ${data.gstAmount.toLocaleString('en-IN')}`]);
+      if (data.gstNumber) {
+        tableBody.push(['GSTIN', data.gstNumber]);
+      }
+    }
+
+    if (data.tdsAmount && data.tdsAmount > 0) {
+      tableBody.push(['TDS Deducted', `INR ${data.tdsAmount.toLocaleString('en-IN')}`]);
+      // TDS is usually deducted from total, so let's just show it, 
+      // but amount paid is usually the net amount. 
+      // Assuming data.amount is the base rent paid.
+    }
+
+    tableBody.push(['Total Amount Paid', `INR ${totalAmount.toLocaleString('en-IN')}`]);
+
     doc.autoTable({
       startY: 75,
       head: [['Description', 'Details']],
-      body: [
-        ['Received From', data.tenantName],
-        ['Property', data.propertyName],
-        ['Address', data.propertyAddress],
-        ['For Month/Year', data.monthYear],
-        ['Payment Mode', data.paymentMode.toUpperCase()],
-        ['Amount Paid', `INR ${data.amount.toLocaleString('en-IN')}`],
-      ],
+      body: tableBody,
       theme: 'striped',
       headStyles: { fillColor: this.brandColor },
       columnStyles: { 0: { fontStyle: 'bold', width: 50 } },
